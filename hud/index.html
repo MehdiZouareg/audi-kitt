@@ -12,358 +12,301 @@
     overflow: hidden;
     touch-action: none;               /* le canvas gère le tactile */
     font-family: "Segoe UI", system-ui, sans-serif;
-  }
-  #scene { position: fixed; inset: 0; }
-  #hud-top {
-    position: fixed; top: 18px; left: 0; right: 0;
-    text-align: center; color: #fff;
-    letter-spacing: .45em; font-size: 13px; font-weight: 300;
-    text-transform: uppercase; opacity: .9;
-    pointer-events: none;
-  }
-  body.synth #hud-top {
     color: #ffe9fb;
-    text-shadow: 0 0 6px #ff2d95, 0 0 18px #ff2d95, 0 0 3px #24e5ff;
   }
-  #status {
-    position: fixed; bottom: 20px; left: 0; right: 0;
-    text-align: center; color: rgba(255,255,255,.45);
-    font-size: 11px; letter-spacing: .25em; text-transform: uppercase;
-    pointer-events: none; transition: opacity 1s;
-  }
-
-  /* ---------- Interface CarPlay ---------- */
   :root {
     --neon-pink: #ff2d95;
     --neon-cyan: #24e5ff;
-    --panel: rgba(16, 4, 34, .55);
-    --panel-border: rgba(255, 45, 149, .35);
   }
-  .tile {
-    background: var(--panel);
-    border: 1px solid var(--panel-border);
-    border-radius: 14px;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    color: #ffe9fb;
-    box-shadow: 0 0 12px rgba(255, 45, 149, .12) inset, 0 4px 24px rgba(0,0,0,.4);
+  #scene { position: fixed; inset: 0; }
+
+  /* Vignette : assombrit légèrement les bords pour la lisibilité du texte. */
+  #vignette {
+    position: fixed; inset: 0; pointer-events: none; z-index: 5;
+    background:
+      linear-gradient(to top, rgba(3,0,10,.55), transparent 28%),
+      linear-gradient(to bottom, rgba(3,0,10,.4), transparent 18%);
   }
 
-  /* Dock vertical gauche, façon CarPlay */
+  #hud-top {
+    position: fixed; top: 16px; left: 0; right: 0;
+    text-align: center;
+    letter-spacing: .45em; font-size: 13px; font-weight: 300;
+    text-transform: uppercase;
+    color: #ffe9fb;
+    text-shadow: 0 0 6px #ff2d95, 0 0 18px #ff2d95, 0 0 3px #24e5ff;
+    pointer-events: none; z-index: 10;
+  }
+  #status {
+    position: fixed; bottom: 8px; right: 14px;
+    color: rgba(255,255,255,.35);
+    font-size: 10px; letter-spacing: .25em; text-transform: uppercase;
+    pointer-events: none; transition: opacity 1s; z-index: 10;
+  }
+
+  /* ---------- Dock : raccourcis de sections ---------- */
   #dock {
     position: fixed; left: 14px; top: 50%;
     transform: translateY(-50%);
     display: flex; flex-direction: column; gap: 10px;
-    padding: 12px 8px;
-    z-index: 10;
-  }
-  #dock button {
-    width: 58px; height: 58px;
-    border: 1px solid var(--panel-border);
-    border-radius: 14px;
-    background: var(--panel);
-    color: rgba(255, 233, 251, .8);
-    font: inherit; font-size: 9px; font-weight: 600;
-    letter-spacing: .12em; text-transform: uppercase;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 4px;
-    cursor: pointer;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    transition: border-color .2s, box-shadow .2s, transform .1s;
-  }
-  #dock button .ic { font-size: 20px; line-height: 1; }
-  #dock button:active { transform: scale(.93); }
-  #dock button.on {
-    border-color: var(--neon-cyan);
-    color: #fff;
-    box-shadow: 0 0 10px rgba(36, 229, 255, .35), 0 0 22px rgba(36, 229, 255, .18);
+    z-index: 20;
   }
   #clock {
     text-align: center; color: rgba(255,233,251,.75);
     font-size: 12px; letter-spacing: .18em;
     margin-bottom: 2px;
   }
-
-  /* Bandeau télémétrie OBD, en bas */
-  #obd {
-    position: fixed; left: 0; right: 0; bottom: 14px;
-    display: flex; justify-content: center; align-items: stretch;
-    gap: 12px;
-    padding: 0 90px;
-    z-index: 10;
-    pointer-events: none;             /* les tuiles réactivent le tactile */
+  #dock button {
+    width: 56px; height: 56px;
+    border: 1px solid rgba(255,45,149,.3);
+    border-radius: 14px;
+    background: rgba(16,4,34,.45);
+    color: rgba(255,233,251,.8);
+    font: inherit; font-size: 9px; font-weight: 600;
+    letter-spacing: .12em; text-transform: uppercase;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 4px; cursor: pointer;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: border-color .2s, box-shadow .2s, transform .1s;
   }
-  #obd .tile { pointer-events: auto; padding: 10px 18px; }
-  #obd .label {
-    font-size: 9px; letter-spacing: .25em; text-transform: uppercase;
-    color: rgba(255, 233, 251, .55);
-  }
-  #speedTile { display: flex; flex-direction: column; align-items: center; min-width: 130px; }
-  #speedVal {
-    font-size: 44px; font-weight: 200; line-height: 1.05;
-    font-variant-numeric: tabular-nums;
-    text-shadow: 0 0 10px rgba(36, 229, 255, .8);
-  }
-  #speedTile .unit { font-size: 10px; letter-spacing: .3em; color: rgba(255,233,251,.6); }
-
-  #rpmTile { flex: 1 1 auto; max-width: 420px; display: flex; flex-direction: column; justify-content: center; gap: 7px; }
-  #rpmBar {
-    height: 10px; border-radius: 5px;
-    background: rgba(255,255,255,.07);
-    overflow: hidden;
-  }
-  #rpmFill {
-    height: 100%; width: 0%;
-    border-radius: 5px;
-    background: linear-gradient(90deg, var(--neon-cyan), var(--neon-pink) 78%, #ff3b3b);
-    box-shadow: 0 0 10px rgba(255, 45, 149, .6);
-    transition: width .12s linear;
-  }
-  #rpmTile .row { display: flex; justify-content: space-between; align-items: baseline; }
-  #rpmVal { font-size: 16px; font-variant-numeric: tabular-nums; }
-
-  .mini { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 4px; min-width: 86px; }
-  .mini .val { font-size: 19px; font-variant-numeric: tabular-nums; }
-  .mini.warn { border-color: #ff3b3b; box-shadow: 0 0 14px rgba(255, 59, 59, .35); }
-  .mini.warn .val { color: #ff6b6b; text-shadow: 0 0 8px rgba(255,59,59,.8); }
-
-  /* ---------- Fenêtres d'apps ---------- */
-  #win {
-    position: fixed; left: 92px; right: 18px; top: 52px; bottom: 20px;
-    display: flex; flex-direction: column;
-    z-index: 20;
-    animation: winIn .22s ease-out;
-  }
-  #win[hidden] { display: none; }
-  @keyframes winIn { from { opacity: 0; transform: translateY(12px) scale(.98); } }
-  .win-head {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 10px 16px;
-    border-bottom: 1px solid rgba(255,45,149,.25);
-  }
-  .win-head .t { letter-spacing: .3em; font-size: 12px; text-transform: uppercase; }
-  #winClose {
-    background: none; border: 1px solid var(--panel-border);
-    color: #ffe9fb; border-radius: 8px;
-    width: 30px; height: 30px; font-size: 13px; cursor: pointer;
-  }
-  #winClose:active { transform: scale(.9); }
-  .win-body { flex: 1; display: flex; overflow: hidden; }
-  .app { flex: 1; display: flex; min-height: 0; }
-  .app[hidden] { display: none; }
-
-  /* Menu latéral commun aux apps */
-  .menu {
-    width: 185px; flex: none;
-    border-right: 1px solid rgba(255,45,149,.2);
-    padding: 12px 10px; overflow: auto;
-    display: flex; flex-direction: column; gap: 6px;
-  }
-  .menu .mtitle {
-    font-size: 9px; letter-spacing: .25em; text-transform: uppercase;
-    color: rgba(255,233,251,.5); margin: 4px 6px 6px;
-  }
-  .menu .mi {
-    text-align: left;
-    background: rgba(255,255,255,.04);
-    border: 1px solid transparent; border-radius: 10px;
-    color: rgba(255,233,251,.85);
-    font: inherit; font-size: 12px;
-    padding: 9px 12px; cursor: pointer;
-  }
-  .menu .mi small { display: block; font-size: 10px; color: rgba(255,233,251,.45); }
-  .menu .mi.on {
+  #dock button .ic { font-size: 19px; line-height: 1; }
+  #dock button:active { transform: scale(.93); }
+  #dock button.on {
     border-color: var(--neon-cyan);
     color: #fff;
-    box-shadow: 0 0 8px rgba(36,229,255,.25);
+    box-shadow: 0 0 10px rgba(36,229,255,.35), 0 0 22px rgba(36,229,255,.18);
   }
-  .content { flex: 1; position: relative; min-width: 0; padding: 14px; overflow: auto; }
+  #pager {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    margin-top: 6px;
+  }
+  #pager i {
+    width: 5px; height: 5px; border-radius: 50%;
+    background: rgba(255,233,251,.25);
+    transition: background .3s, box-shadow .3s;
+  }
+  #pager i.on { background: var(--neon-cyan); box-shadow: 0 0 8px var(--neon-cyan); }
 
-  /* --- Nav --- */
-  #winNav .content { padding: 0; overflow: hidden; }
-  #navMap { position: absolute; inset: 0; width: 100%; height: 100%; }
-  #navBanner {
-    position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
-    padding: 8px 18px; font-size: 13px; white-space: nowrap;
+  /* ---------- Sections : couches HUD sans fenêtres ---------- */
+  .sec {
+    position: fixed; inset: 0;
+    pointer-events: none;             /* la scène reste orientable partout… */
+    opacity: 0; transform: translateY(18px);
+    transition: opacity .45s ease, transform .45s ease;
+    z-index: 10;
   }
-  #navEta {
-    position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
-    padding: 7px 16px; font-size: 12px; white-space: nowrap;
-    color: rgba(255,233,251,.85);
-  }
-  #navEta b { color: var(--neon-cyan); font-weight: 600; }
+  .sec.on { opacity: 1; transform: none; }
+  .sec button, .sec .touch { pointer-events: auto; }   /* …sauf sur les contrôles */
 
-  /* --- Audio --- */
-  #winAudio .content {
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center; gap: 12px;
+  .label {
+    font-size: 10px; letter-spacing: .3em; text-transform: uppercase;
+    color: rgba(255,233,251,.55);
   }
-  #cover {
-    width: 150px; height: 150px; border-radius: 16px;
-    background:
-      radial-gradient(circle at 30% 25%, rgba(36,229,255,.5), transparent 55%),
-      radial-gradient(circle at 75% 80%, rgba(255,45,149,.6), transparent 60%),
-      #14042b;
-    border: 1px solid var(--panel-border);
-    box-shadow: 0 0 24px rgba(255,45,149,.25);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 44px;
+  .huge {
+    font-weight: 200; line-height: 1;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 14px rgba(36,229,255,.75);
   }
-  #trackTitle { font-size: 17px; letter-spacing: .08em; }
-  #trackArtist { font-size: 12px; color: rgba(255,233,251,.55); letter-spacing: .2em; text-transform: uppercase; }
-  #audioProg { width: min(70%, 340px); display: flex; align-items: center; gap: 10px; font-size: 10px; color: rgba(255,233,251,.6); }
-  #audioBar { flex: 1; height: 5px; border-radius: 3px; background: rgba(255,255,255,.09); overflow: hidden; }
+
+  /* --- Section kiTT (dashboard) --- */
+  #sec-car .speed {
+    position: absolute; left: 100px; bottom: 44px;
+  }
+  #sec-car .speed .huge { font-size: 96px; }
+  #sec-car .rpmzone {
+    position: absolute; right: 36px; bottom: 44px; text-align: right;
+  }
+  #sec-car .rpmzone .huge { font-size: 44px; text-shadow: 0 0 12px rgba(255,45,149,.75); }
+  #carRpmBar {
+    width: 240px; height: 6px; border-radius: 3px;
+    background: rgba(255,255,255,.08);
+    overflow: hidden; margin-top: 10px; margin-left: auto;
+  }
+  #carRpmFill {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, var(--neon-cyan), var(--neon-pink) 78%, #ff3b3b);
+    box-shadow: 0 0 10px rgba(255,45,149,.6);
+    transition: width .12s linear;
+  }
+  #sec-car .minis {
+    position: absolute; right: 36px; top: 72px; text-align: right;
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  #sec-car .minis .v { font-size: 22px; font-variant-numeric: tabular-nums; }
+  #sec-car .minis .warn { color: #ff6b6b; text-shadow: 0 0 10px rgba(255,59,59,.8); }
+
+  /* --- Section Nav --- */
+  #sec-nav .banner {
+    position: absolute; top: 60px; left: 0; right: 0; text-align: center;
+  }
+  #sec-nav .banner .huge { font-size: 34px; text-shadow: 0 0 14px rgba(36,229,255,.7); }
+  #sec-nav .eta {
+    position: absolute; bottom: 44px; left: 0; right: 0; text-align: center;
+    font-size: 22px; font-weight: 300;
+  }
+  #sec-nav .eta b { color: var(--neon-cyan); font-weight: 600; }
+  #sec-nav .dests {
+    position: absolute; left: 100px; top: 50%; transform: translateY(-50%);
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  #sec-nav .dests button {
+    background: none; border: none; text-align: left;
+    color: rgba(255,233,251,.55);
+    font: inherit; font-size: 19px; font-weight: 300;
+    padding: 6px 0; cursor: pointer;
+    transition: color .2s, text-shadow .2s;
+  }
+  #sec-nav .dests button small { font-size: 11px; margin-left: 10px; color: rgba(255,233,251,.35); }
+  #sec-nav .dests button.on {
+    color: #fff; text-shadow: 0 0 10px var(--neon-cyan);
+  }
+
+  /* --- Section Audio --- */
+  #sec-audio .now {
+    position: absolute; bottom: 44px; left: 0; right: 0; text-align: center;
+  }
+  #trackTitle { font-size: 42px; font-weight: 200; text-shadow: 0 0 14px rgba(255,45,149,.7); }
+  #trackArtist { font-size: 13px; letter-spacing: .35em; text-transform: uppercase; color: rgba(255,233,251,.6); margin-top: 6px; }
+  #audioProg {
+    width: min(46%, 420px); margin: 18px auto 0;
+    display: flex; align-items: center; gap: 12px;
+    font-size: 11px; color: rgba(255,233,251,.6);
+    font-variant-numeric: tabular-nums;
+  }
+  #audioBar { flex: 1; height: 4px; border-radius: 2px; background: rgba(255,255,255,.1); overflow: hidden; }
   #audioFill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--neon-cyan), var(--neon-pink)); }
-  #audioCtl { display: flex; gap: 14px; }
+  #audioCtl { display: flex; gap: 26px; justify-content: center; margin-top: 14px; }
   #audioCtl button {
-    width: 46px; height: 46px; border-radius: 50%;
-    background: var(--panel); border: 1px solid var(--panel-border);
-    color: #ffe9fb; font-size: 17px; cursor: pointer;
+    background: none; border: none; color: #ffe9fb;
+    font-size: 26px; cursor: pointer;
+    text-shadow: 0 0 10px rgba(36,229,255,.5);
   }
-  #audioCtl button:active { transform: scale(.92); }
-  #btnPlay { border-color: var(--neon-cyan); box-shadow: 0 0 10px rgba(36,229,255,.3); }
+  #audioCtl button:active { transform: scale(.9); }
+  #sec-audio .playlist {
+    position: absolute; left: 100px; top: 50%; transform: translateY(-50%);
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  #sec-audio .playlist button {
+    background: none; border: none; text-align: left;
+    color: rgba(255,233,251,.5);
+    font: inherit; font-size: 17px; font-weight: 300;
+    padding: 5px 0; cursor: pointer;
+  }
+  #sec-audio .playlist button.on { color: #fff; text-shadow: 0 0 10px var(--neon-pink); }
 
-  /* --- OBD --- */
-  #winObd .content {
-    display: grid; gap: 12px;
-    grid-template-columns: minmax(220px, 1.2fr) 1fr;
-    align-content: start;
+  /* --- Section OBD --- */
+  #sec-obd .rpmbig {
+    position: absolute; left: 100px; bottom: 44px;
   }
-  .pane { padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-  .pane .label { font-size: 9px; letter-spacing: .25em; text-transform: uppercase; color: rgba(255,233,251,.55); }
-  #rpmArcWrap { display: flex; align-items: center; justify-content: center; position: relative; }
-  #rpmArcVal { position: absolute; text-align: center; font-size: 24px; font-variant-numeric: tabular-nums; }
-  #rpmArcVal small { display: block; font-size: 9px; letter-spacing: .2em; color: rgba(255,233,251,.5); }
-  #spark { width: 100%; height: 74px; }
-  #obdGrid { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; }
-  #obdGrid .cell { padding: 10px 12px; text-align: center; }
-  #obdGrid .cell .v { font-size: 21px; font-variant-numeric: tabular-nums; }
-  #obdAlerts { grid-column: 1 / -1; font-size: 11px; color: rgba(255,233,251,.6); padding: 8px 14px; }
-  #obdAlerts .alert { color: #ff6b6b; text-shadow: 0 0 8px rgba(255,59,59,.6); }
+  #sec-obd .rpmbig .huge { font-size: 74px; text-shadow: 0 0 14px rgba(255,45,149,.75); }
+  #sec-obd .grid {
+    position: absolute; right: 36px; top: 50%; transform: translateY(-50%);
+    display: flex; flex-direction: column; gap: 20px; text-align: right;
+  }
+  #sec-obd .grid .v { font-size: 32px; font-weight: 200; font-variant-numeric: tabular-nums; }
+  #sec-obd .grid .warn .v { color: #ff6b6b; text-shadow: 0 0 12px rgba(255,59,59,.8); }
+  #sec-obd .sparkzone {
+    position: absolute; left: 100px; bottom: 150px; width: min(38%, 420px);
+  }
+  #spark { width: 100%; height: 64px; display: block; }
+  #obdAlert {
+    position: absolute; top: 60px; left: 0; right: 0; text-align: center;
+    font-size: 20px; color: #ff6b6b; text-shadow: 0 0 12px rgba(255,59,59,.8);
+    letter-spacing: .1em;
+  }
 </style>
 </head>
 <body>
 <div id="scene"></div>
+<div id="vignette"></div>
 <div id="hud-top">Audi &nbsp;kiTT</div>
 <div id="status">chargement du modèle…</div>
 
-<!-- Dock d'apps, façon CarPlay -->
+<!-- Dock : raccourcis vers les sections (scroll / swipe fait pareil) -->
 <nav id="dock">
   <div id="clock">--:--</div>
-  <button id="appCar" class="on"><span class="ic">🏁</span>kiTT</button>
-  <button id="appNav"><span class="ic">🧭</span>Nav</button>
-  <button id="appAudio"><span class="ic">🎵</span>Audio</button>
-  <button id="appObd"><span class="ic">📊</span>OBD</button>
+  <button data-sec="car" class="on"><span class="ic">🏁</span>kiTT</button>
+  <button data-sec="nav"><span class="ic">🧭</span>Nav</button>
+  <button data-sec="audio"><span class="ic">🎵</span>Audio</button>
+  <button data-sec="obd"><span class="ic">📊</span>OBD</button>
+  <div id="pager"><i class="on"></i><i></i><i></i><i></i></div>
 </nav>
 
-<!-- Bandeau télémétrie OBD -->
-<section id="obd">
-  <div class="tile" id="speedTile">
-    <span id="speedVal">0</span>
-    <span class="unit">km/h</span>
+<!-- ===== Section kiTT : dashboard ===== -->
+<section class="sec on" id="sec-car">
+  <div class="speed">
+    <div class="label">Vitesse</div>
+    <div class="huge"><span id="carSpeed">0</span></div>
+    <div class="label">km/h</div>
   </div>
-  <div class="tile" id="rpmTile">
-    <div class="row"><span class="label">Régime</span><span id="rpmVal">0 tr/min</span></div>
-    <div id="rpmBar"><div id="rpmFill"></div></div>
+  <div class="rpmzone">
+    <div class="label">Régime</div>
+    <div class="huge" id="carRpm">850</div>
+    <div id="carRpmBar"><div id="carRpmFill"></div></div>
   </div>
-  <div class="tile mini" id="tempTile">
-    <span class="label">Temp. eau</span>
-    <span class="val" id="tempVal">--°</span>
-  </div>
-  <div class="tile mini" id="fuelTile">
-    <span class="label">Carburant</span>
-    <span class="val" id="fuelVal">--%</span>
+  <div class="minis">
+    <div><div class="label">Temp. eau</div><div class="v" id="carTemp">--°</div></div>
+    <div><div class="label">Carburant</div><div class="v" id="carFuel">--%</div></div>
   </div>
 </section>
 
-<!-- Fenêtre d'app (une seule ouverte à la fois ; kiTT = pas de fenêtre) -->
-<div id="win" class="tile" hidden>
-  <header class="win-head">
-    <span class="t" id="winTitle">—</span>
-    <button id="winClose" aria-label="Fermer">✕</button>
-  </header>
-  <div class="win-body">
-
-    <!-- ===== Navigation ===== -->
-    <section class="app" id="winNav" hidden>
-      <nav class="menu">
-        <div class="mtitle">Destinations</div>
-        <button class="mi on" data-dist="4.2" data-street="Rue du Turbo">Maison<small>4,2 km</small></button>
-        <button class="mi" data-dist="12.8" data-street="Av. Quattro">Travail<small>12,8 km</small></button>
-        <button class="mi" data-dist="1.1" data-street="Bd. des Anneaux">Station-service<small>1,1 km</small></button>
-        <button class="mi" data-dist="187" data-street="A11 — Ouest">Circuit du Mans<small>187 km</small></button>
-      </nav>
-      <div class="content">
-        <canvas id="navMap"></canvas>
-        <div class="tile" id="navBanner">↱ Dans 400 m, tourne à droite</div>
-        <div class="tile" id="navEta">—</div>
-      </div>
-    </section>
-
-    <!-- ===== Audio ===== -->
-    <section class="app" id="winAudio" hidden>
-      <nav class="menu">
-        <div class="mtitle">Playlist — Night Drive</div>
-        <!-- remplie par le script -->
-      </nav>
-      <div class="content">
-        <div id="cover">💿</div>
-        <div id="trackTitle">—</div>
-        <div id="trackArtist">—</div>
-        <div id="audioProg">
-          <span id="tCur">0:00</span>
-          <div id="audioBar"><div id="audioFill"></div></div>
-          <span id="tEnd">0:00</span>
-        </div>
-        <div id="audioCtl">
-          <button id="btnPrev">⏮</button>
-          <button id="btnPlay">▶</button>
-          <button id="btnNext">⏭</button>
-        </div>
-      </div>
-    </section>
-
-    <!-- ===== OBD ===== -->
-    <section class="app" id="winObd" hidden>
-      <div class="content">
-        <div class="pane tile" id="rpmPane">
-          <span class="label">Régime moteur</span>
-          <div id="rpmArcWrap">
-            <svg viewBox="0 0 200 115" width="200" height="115">
-              <defs>
-                <linearGradient id="rpmGrad" x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0%"  stop-color="#24e5ff"/>
-                  <stop offset="72%" stop-color="#ff2d95"/>
-                  <stop offset="100%" stop-color="#ff3b3b"/>
-                </linearGradient>
-              </defs>
-              <path d="M 20 108 A 80 80 0 0 1 180 108" fill="none"
-                    stroke="rgba(255,255,255,.08)" stroke-width="10" stroke-linecap="round"/>
-              <path id="rpmArc" d="M 20 108 A 80 80 0 0 1 180 108" fill="none"
-                    stroke="url(#rpmGrad)" stroke-width="10" stroke-linecap="round"
-                    stroke-dasharray="251.3" stroke-dashoffset="251.3"/>
-            </svg>
-            <div id="rpmArcVal">—<small>tr/min</small></div>
-          </div>
-        </div>
-        <div class="pane tile">
-          <span class="label">Vitesse — 60 dernières secondes</span>
-          <canvas id="spark"></canvas>
-          <span class="label" style="text-align:right" id="sparkNow">—</span>
-        </div>
-        <div id="obdGrid">
-          <div class="cell tile"><div class="label">Temp. eau</div><div class="v" id="oTemp">—</div></div>
-          <div class="cell tile"><div class="label">Carburant</div><div class="v" id="oFuel">—</div></div>
-          <div class="cell tile"><div class="label">Batterie</div><div class="v" id="oVolt">—</div></div>
-          <div class="cell tile"><div class="label">Turbo</div><div class="v" id="oBoost">—</div></div>
-        </div>
-        <div class="tile" id="obdAlerts">Aucune alerte — tous les paramètres sont nominaux.</div>
-      </div>
-    </section>
-
+<!-- ===== Section Nav : la scène EST la carte (vue de haut + itinéraire au sol) ===== -->
+<section class="sec" id="sec-nav">
+  <div class="banner">
+    <div class="huge" id="navBanner">↱ …</div>
   </div>
-</div>
+  <div class="dests">
+    <div class="label" style="margin-bottom:8px">Destinations</div>
+    <button class="on" data-dist="4.2"  data-street="Rue du Turbo">Maison<small>4,2 km</small></button>
+    <button data-dist="12.8" data-street="Av. Quattro">Travail<small>12,8 km</small></button>
+    <button data-dist="1.1"  data-street="Bd. des Anneaux">Station-service<small>1,1 km</small></button>
+    <button data-dist="187"  data-street="A11 — Ouest">Circuit du Mans<small>187 km</small></button>
+  </div>
+  <div class="eta" id="navEta">—</div>
+</section>
+
+<!-- ===== Section Audio ===== -->
+<section class="sec" id="sec-audio">
+  <div class="playlist">
+    <div class="label" style="margin-bottom:8px">Playlist — Night Drive</div>
+    <!-- remplie par le script -->
+  </div>
+  <div class="now">
+    <div id="trackTitle">—</div>
+    <div id="trackArtist">—</div>
+    <div id="audioProg">
+      <span id="tCur">0:00</span>
+      <div id="audioBar"><div id="audioFill"></div></div>
+      <span id="tEnd">0:00</span>
+    </div>
+    <div id="audioCtl">
+      <button id="btnPrev">⏮</button>
+      <button id="btnPlay">▶</button>
+      <button id="btnNext">⏭</button>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Section OBD : diagnostic en grand ===== -->
+<section class="sec" id="sec-obd">
+  <div id="obdAlert"></div>
+  <div class="sparkzone">
+    <div class="label">Vitesse — 60 s</div>
+    <canvas id="spark"></canvas>
+  </div>
+  <div class="rpmbig">
+    <div class="label">Régime moteur</div>
+    <div class="huge" id="obdRpm">—</div>
+    <div class="label">tr/min</div>
+  </div>
+  <div class="grid">
+    <div><div class="label">Temp. eau</div><div class="v" id="oTemp">—</div></div>
+    <div><div class="label">Carburant</div><div class="v" id="oFuel">—</div></div>
+    <div><div class="label">Batterie</div><div class="v" id="oVolt">—</div></div>
+    <div><div class="label">Turbo</div><div class="v" id="oBoost">—</div></div>
+  </div>
+</section>
 
 <script type="importmap">
 {
@@ -387,11 +330,11 @@ import { OutputPass }      from "three/addons/postprocessing/OutputPass.js";
 
 // Réglages rapides via l'URL :
 //   ?mode=synth  → néon synthwave (défaut) : contours cyan/rose + grille + bloom
-//   ?mode=wire   → silhouette hologramme blanche
 //   ?mode=real   → rendu réaliste (peinture noire satinée)
+//   ?mode=wire   → silhouette hologramme blanche
 //   ?mode=edges  → wireframe par arêtes (+ ?edges=25 : seuil en degrés)
 //   ?cut=0.5&soft=0.22 → seuil/douceur du trait (synth et wire)
-//   ?bloom=1.1   → intensité du glow (synth)
+//   ?bloom=0.8   → intensité du glow (synth)
 //   ?model=v3|v4|v5
 const params = new URLSearchParams(location.search);
 const MODE  = params.get("mode") || "synth";
@@ -401,7 +344,6 @@ const EDGE_THRESHOLD = Number(params.get("edges")) || 18;
 const CUT   = Number(params.get("cut"))   || (SYNTH ? 0.66 : 0.5);
 const SOFT  = Number(params.get("soft"))  || (SYNTH ? 0.14 : 0.22);
 const BLOOM = Number(params.get("bloom")) || 0.55;
-if (SYNTH) document.body.classList.add("synth");
 
 // Palette néon
 const NEON_PINK = new THREE.Color(0xff2d95);
@@ -455,16 +397,15 @@ if (REAL) {
   const key = new THREE.DirectionalLight(0xffffff, 1.6);
   key.position.set(4, 6, 3);
   scene.add(key);
-  const rim = new THREE.DirectionalLight(0xdde4f0, 0.3);   // liseré froid discret côté opposé
+  const rim = new THREE.DirectionalLight(0xdde4f0, 0.3);
   rim.position.set(-5, 3, -4);
   scene.add(rim);
   scene.add(new THREE.AmbientLight(0xffffff, 0.15));
 }
 
 // Caméra orthographique => vraie vue isométrique (pas de fuyantes).
-// Élévation ~24° : assez bas pour lire le profil, assez haut pour la grille.
-const ISO_ELEV = 0.42;                           // radians
-let frustum = SYNTH ? 3.1 : 2.7;   // un peu de recul en synth pour lire la grille
+const ISO_ELEV = 0.42;                           // radians (~24°)
+let frustum = SYNTH ? 3.1 : 2.7;
 const camera = new THREE.OrthographicCamera();
 function sizeCamera() {
   const a = innerWidth / innerHeight;
@@ -482,13 +423,7 @@ let composer = null;
 if (SYNTH) {
   composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
-  const bloom = new UnrealBloomPass(
-    new THREE.Vector2(innerWidth, innerHeight),
-    BLOOM,      // force
-    0.4,        // rayon
-    0.4         // seuil : seuls les traits vraiment lumineux diffusent
-  );
-  composer.addPass(bloom);
+  composer.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), BLOOM, 0.4, 0.4));
   composer.addPass(new OutputPass());
 }
 
@@ -497,11 +432,11 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
 controls.enablePan = false;
+controls.enableZoom = false;           // la molette sert à changer de section
 controls.autoRotate = true;
 controls.autoRotateSpeed = 1.2;
-controls.minPolarAngle = 0.5;          // assez haut pour la vue "carte" (app Nav)…
+controls.minPolarAngle = 0.35;         // assez haut pour la vue "carte" (Nav)…
 controls.maxPolarAngle = 1.45;         // …jusqu'au quasi-profil
-controls.minZoom = 0.5; controls.maxZoom = 3;
 
 // Un doigt sur l'écran stoppe la rotation ; elle reprend 3 s après.
 let resumeTimer = null;
@@ -514,26 +449,25 @@ controls.addEventListener("end", () => {
   resumeTimer = setTimeout(() => { controls.autoRotate = true; }, 3000);
 });
 
-// ---------- Vols de caméra : transitions voiture <-> fenêtres ----------
-// Chaque app cadre la voiture sous l'angle qui lui "parle" : l'OBD montre
-// l'avant (le moteur), la Nav prend de la hauteur (vue carte), l'Audio se
-// pose en profil rapproché. Fermer une fenêtre ramène l'iso par défaut.
+// ---------- Vols de caméra : transitions entre sections ----------
+// Chaque section cadre la voiture sous son angle : le dashboard en iso,
+// la Nav en plongée (la scène devient la carte), l'Audio en profil,
+// l'OBD sur la face avant (le moteur).
 const VIEWS = {
-  default:  { theta: Math.PI / 4,           phi: Math.PI / 2 - ISO_ELEV, zoom: 1.0 },
-  appNav:   { theta: Math.PI / 4,           phi: 0.58, zoom: 0.82 },
-  appAudio: { theta: 0.06,                  phi: 1.32, zoom: 1.28 },
-  appObd:   { theta: Math.PI / 4 + Math.PI, phi: 1.22, zoom: 1.18 },
+  car:   { theta: Math.PI / 4,           phi: Math.PI / 2 - ISO_ELEV, zoom: 1.0,  rotate: true  },
+  nav:   { theta: Math.PI / 4,           phi: 0.42, zoom: 0.78, rotate: false },
+  audio: { theta: 0.06,                  phi: 1.32, zoom: 1.22, rotate: false },
+  obd:   { theta: Math.PI / 4 + Math.PI, phi: 1.22, zoom: 1.12, rotate: false },
 };
 let flight = null;
 const _sph = new THREE.Spherical();
 
 window.__kittFly = (name) => {
-  const v = VIEWS[name] || VIEWS.default;
-  flight = { ...v, resume: name === "default" };   // l'auto-rotation ne reprend qu'en vue par défaut
+  const v = VIEWS[name] || VIEWS.car;
+  flight = { ...v };
   controls.autoRotate = false;
   clearTimeout(resumeTimer);
 };
-// Un doigt posé pendant le vol : l'utilisateur reprend la main.
 controls.addEventListener("start", () => { flight = null; });
 
 const wrapAngle = (a) => ((a + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
@@ -553,7 +487,7 @@ function stepFlight(dt) {
   camera.zoom += dZoom * k;
   camera.updateProjectionMatrix();
   if (Math.abs(dTheta) < 0.01 && Math.abs(dPhi) < 0.01 && Math.abs(dZoom) < 0.01) {
-    if (flight.resume) controls.autoRotate = true;
+    if (flight.rotate) controls.autoRotate = true;   // l'iso par défaut re-tourne
     flight = null;
   }
 }
@@ -569,8 +503,7 @@ function circlePoints(radius, y = 0, segments = 128) {
 }
 
 if (SYNTH) {
-  // Grille polaire néon : anneaux concentriques + rayons magenta, qui
-  // s'estompent vers l'extérieur — le "sol infini" synthwave, version podium.
+  // Grille polaire néon : anneaux concentriques + rayons magenta.
   const grid = new THREE.Group();
   for (let r = 1.4; r <= 6.5; r += 0.85) {
     const fade = Math.max(0.06, 0.55 - (r - 1.4) * 0.09);
@@ -590,23 +523,45 @@ if (SYNTH) {
   grid.position.y = -0.01;
   scene.add(grid);
 } else {
-  // Anneaux HUD discrets des autres modes.
   const mk = (r, o) => new THREE.Line(
     new THREE.BufferGeometry().setFromPoints(circlePoints(r)),
     new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: o }));
   scene.add(mk(2.6, 0.18), mk(2.75, 0.07));
 }
 
-if (REAL) {
-  // Plateau sombre légèrement brillant sous la voiture (ancre visuelle).
-  const disc = new THREE.Mesh(
-    new THREE.CircleGeometry(2.55, 64),
-    new THREE.MeshStandardMaterial({ color: 0x050507, roughness: 0.85, metalness: 0.15,
-                                     envMapIntensity: 0.25 })
-  );
-  disc.rotation.x = -Math.PI / 2;
-  disc.position.y = -0.005;
-  scene.add(disc);
+// ---------- Itinéraire Nav : tracé néon au sol, visible en vue carte ----------
+// La section Nav ne dessine pas de carte à part : la caméra prend de la
+// hauteur et l'itinéraire apparaît DANS la scène, au sol, devant la voiture.
+const routeGroup = new THREE.Group();
+{
+  const pts = [
+    new THREE.Vector3( 2.4, 0.03,  2.4),
+    new THREE.Vector3( 0.0, 0.03,  0.0),
+    new THREE.Vector3(-1.7, 0.03, -1.7),
+    new THREE.Vector3(-0.4, 0.03, -3.4),
+    new THREE.Vector3( 1.8, 0.03, -4.6),
+  ];
+  const curve = new THREE.CatmullRomCurve3(pts);
+  const routeGeo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(80));
+  routeGroup.add(new THREE.Line(routeGeo, new THREE.LineBasicMaterial({
+    color: NEON_CYAN, transparent: true, opacity: 0 })));
+  // Destination : petit anneau au bout du tracé.
+  const end = pts[pts.length - 1];
+  const ring = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(circlePoints(0.28, 0, 48)),
+    new THREE.LineBasicMaterial({ color: NEON_CYAN, transparent: true, opacity: 0 }));
+  ring.position.copy(end);
+  routeGroup.add(ring);
+}
+scene.add(routeGroup);
+let routeTarget = 0;                    // opacité cible (1 en section Nav)
+window.__kittRoute = (visible) => { routeTarget = visible ? 1 : 0; };
+function stepRoute(dt) {
+  const k = 1 - Math.exp(-6 * dt);
+  for (const child of routeGroup.children) {
+    const m = child.material;
+    m.opacity += ((child.userData.max ?? (child.userData.max = m === routeGroup.children[0].material ? 0.85 : 0.6)) * routeTarget - m.opacity) * k;
+  }
 }
 
 // ---------- Voiture ----------
@@ -616,9 +571,6 @@ scene.add(carGroup);
 const edgeMat = new THREE.LineBasicMaterial({
   color: 0xffffff, transparent: true, opacity: 0.9,
 });
-// Faces sombres opaques : masquent ce qui est de l'autre côté de la
-// carrosserie, sans quoi le contour devient une bouillie de traits.
-// En synthwave, légèrement violettes pour se fondre dans le ciel.
 const hullMat = new THREE.MeshBasicMaterial({
   color: SYNTH ? 0x0a0316 : 0x000000,
   polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
@@ -633,7 +585,7 @@ const rimMat = new THREE.ShaderMaterial({
     uSynth:  { value: SYNTH ? 1.0 : 0.0 },
     uPink:   { value: NEON_PINK },
     uCyan:   { value: NEON_CYAN },
-    uMinY:   { value: 0.0 },   // bornes verticales du modèle (remplies au chargement)
+    uMinY:   { value: 0.0 },
     uMaxY:   { value: 1.0 },
   },
   vertexShader: /* glsl */`
@@ -655,16 +607,12 @@ const rimMat = new THREE.ShaderMaterial({
     varying vec3 vNormal;
     varying float vY;
     void main() {
-      // f vaut 1 exactement sur la silhouette, 0 face caméra. Le smoothstep
-      // coupe tout sous le seuil : il ne reste qu'un TRAIT au contour.
       float f = 1.0 - abs(normalize(vNormal).z);
       float line = smoothstep(uCut, uCut + uSoft, f);
       float h = clamp((vY - uMinY) / (uMaxY - uMinY), 0.0, 1.0);
       vec3 white = vec3(1.0);
-      vec3 neon  = mix(uPink, uCyan, h);      // bas rose -> haut cyan
+      vec3 neon  = mix(uPink, uCyan, h);
       vec3 col   = mix(white, neon, uSynth);
-      // alpha 1.0 : en blending additif, l'alpha module la couleur ajoutée ;
-      // on ne veut PAS re-multiplier (ça met l'effet au carré et l'éteint).
       gl_FragColor = vec4(col * line, 1.0);
     }`,
   transparent: true,
@@ -691,32 +639,26 @@ function loadCar(chain) {
             carGroup.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo, EDGE_THRESHOLD), edgeMat));
             return;
           }
-          // Silhouette : normales lissées indispensables (le fresnel les suit).
           if (geo.index === null) geo = mergeVertices(geo, 1e-4);
           geo.computeVertexNormals();
           const hull = new THREE.Mesh(geo, hullMat);
           const rim  = new THREE.Mesh(geo, rimMat);
-          rim.renderOrder = 1;                 // par-dessus le masque
+          rim.renderOrder = 1;
           carGroup.add(hull, rim);
         });
       } else {
         gltf.scene.traverse((node) => {
           if (!node.isMesh) return;
-          // 1) Shading lissé : refusionne les sommets (le scan arrive souvent
-          //    éclaté par triangles) puis recalcule des normales moyennes.
           let geo = node.geometry;
           if (geo.index === null) geo = mergeVertices(geo, 1e-4);
           geo.computeVertexNormals();
           node.geometry = geo;
-          // 2) Peinture auto : vernis par-dessus la texture du scan.
           const src = node.material;
           node.material = new THREE.MeshPhysicalMaterial({
             map: src.map ?? null,
             color: src.color ?? new THREE.Color(0xffffff),
-            roughness: 0.55,
-            metalness: 0.12,
-            clearcoat: 0.35,
-            clearcoatRoughness: 0.3,
+            roughness: 0.55, metalness: 0.12,
+            clearcoat: 0.35, clearcoatRoughness: 0.3,
             envMapIntensity: 0.55,
             transparent: src.transparent, opacity: src.opacity ?? 1,
           });
@@ -733,17 +675,16 @@ function loadCar(chain) {
       carGroup.position.sub(center.multiplyScalar(s));
       carGroup.position.y += (size.y * s) / 2;
 
-      // Bornes verticales pour le dégradé rose→cyan du shader.
       const scaled = new THREE.Box3().setFromObject(carGroup);
       rimMat.uniforms.uMinY.value = scaled.min.y;
       rimMat.uniforms.uMaxY.value = scaled.max.y;
 
-      statusEl.textContent = "toucher pour orienter";
-      setTimeout(() => (statusEl.style.opacity = 0), 4000);
+      statusEl.textContent = "scroll / swipe : sections · toucher : orienter";
+      setTimeout(() => (statusEl.style.opacity = 0), 6000);
       window.__kitt = { scene, camera, controls, carGroup, renderer, composer, stepFlight };
     },
     undefined,
-    () => loadCar(chain.slice(1))     // repli sur le modèle suivant
+    () => loadCar(chain.slice(1))
   );
 }
 loadCar(modelChain);
@@ -755,6 +696,7 @@ renderer.setAnimationLoop(() => {
   const dt = Math.min(0.1, (now - prevT) / 1000);
   prevT = now;
   stepFlight(dt);
+  stepRoute(dt);
   controls.update();
   if (composer) composer.render();
   else renderer.render(scene, camera);
@@ -769,14 +711,13 @@ addEventListener("resize", () => {
 
 <script type="module">
 // ============================================================
-//  Interface CarPlay : horloge, dock, télémétrie OBD
+//  Environnement scrollé : sections, horloge, télémétrie OBD
 // ============================================================
-//  Premier jet : la télémétrie vient d'un SIMULATEUR de conduite côté
-//  navigateur (cycle accélération / croisière / décélération / ralenti).
-//  La classe expose la même forme de données que python/obd.py
-//  (speed, rpm, coolant_temp, fuel) : pour brancher la vraie voiture, il
-//  suffira de remplacer SimTelemetry par un poll de /telemetry servi par
-//  le MPU (serve.py --> service.py --> dongle ELM327).
+//  Pas de fenêtres : l'interface est une suite de SECTIONS superposées à
+//  la scène 3D. Scroll (molette), swipe horizontal, ou dock → la caméra
+//  vole vers la vue de la section et ses infos s'affichent en grand.
+//  La télémétrie vient d'un simulateur de conduite (même forme de données
+//  que python/obd.py) — à remplacer par un poll de /telemetry plus tard.
 
 // ---------- Horloge ----------
 const clockEl = document.getElementById("clock");
@@ -788,52 +729,59 @@ function tickClock() {
 tickClock();
 setInterval(tickClock, 10_000);
 
-// ---------- Dock + gestionnaire de fenêtres ----------
-// Une seule fenêtre à la fois ; l'app kiTT = pas de fenêtre (scène 3D nue).
-const winEl    = document.getElementById("win");
-const winTitle = document.getElementById("winTitle");
-const APPS = {
-  appNav:   { title: "Navigation", el: () => document.getElementById("winNav") },
-  appAudio: { title: "Audio",      el: () => document.getElementById("winAudio") },
-  appObd:   { title: "Diagnostic OBD-II", el: () => document.getElementById("winObd") },
-};
-let currentApp = null;   // id du bouton, ou null (kiTT)
+// ---------- Sections ----------
+const SECTIONS = ["car", "nav", "audio", "obd"];
+let secIdx = 0;
 
-function selectApp(id) {
-  document.querySelector("#dock button.on")?.classList.remove("on");
-  document.getElementById(id).classList.add("on");
-  for (const a of Object.values(APPS)) a.el().hidden = true;
-  if (id === "appCar") {
-    winEl.hidden = true;
-    currentApp = null;
-  } else {
-    const app = APPS[id];
-    winTitle.textContent = app.title;
-    app.el().hidden = false;
-    winEl.hidden = false;
-    currentApp = id;
-    if (id === "appNav") navResize();      // le canvas carte suit la fenêtre
-  }
-  // Le bandeau OBD du bas n'a de sens que sur l'écran principal.
-  document.getElementById("obd").style.display = currentApp ? "none" : "flex";
-  // La caméra vole vers la vue qui correspond à l'app.
-  window.__kittFly?.(id === "appCar" ? "default" : id);
+function setSection(idx) {
+  secIdx = (idx + SECTIONS.length) % SECTIONS.length;
+  const name = SECTIONS[secIdx];
+  document.querySelectorAll(".sec").forEach(s => s.classList.toggle("on", s.id === "sec-" + name));
+  document.querySelectorAll("#dock button").forEach(b => b.classList.toggle("on", b.dataset.sec === name));
+  document.querySelectorAll("#pager i").forEach((p, i) => p.classList.toggle("on", i === secIdx));
+  window.__kittFly?.(name);
+  window.__kittRoute?.(name === "nav");
 }
 for (const btn of document.querySelectorAll("#dock button"))
-  btn.addEventListener("click", () => selectApp(btn.id));
-document.getElementById("winClose").addEventListener("click", () => selectApp("appCar"));
+  btn.addEventListener("click", () => setSection(SECTIONS.indexOf(btn.dataset.sec)));
+
+// Molette : section suivante/précédente (avec garde anti-rafale).
+let wheelLock = 0;
+addEventListener("wheel", (e) => {
+  const now = performance.now();
+  if (now < wheelLock || Math.abs(e.deltaY) < 10) return;
+  wheelLock = now + 900;                 // le temps du vol de caméra
+  setSection(secIdx + (e.deltaY > 0 ? 1 : -1));
+}, { passive: true });
+
+// Flèches clavier (pratique sur desktop).
+addEventListener("keydown", (e) => {
+  if (e.key === "ArrowRight" || e.key === "ArrowDown") setSection(secIdx + 1);
+  if (e.key === "ArrowLeft"  || e.key === "ArrowUp")   setSection(secIdx - 1);
+});
+
+// Swipe horizontal rapide : changer de section ; glisser lent : orbiter.
+let touchStart = null;
+addEventListener("pointerdown", (e) => { touchStart = { x: e.clientX, y: e.clientY, t: performance.now() }; });
+addEventListener("pointerup", (e) => {
+  if (!touchStart) return;
+  const dx = e.clientX - touchStart.x, dy = e.clientY - touchStart.y;
+  const dt = performance.now() - touchStart.t;
+  touchStart = null;
+  if (dt < 350 && Math.abs(dx) > 80 && Math.abs(dx) > 2.5 * Math.abs(dy))
+    setSection(secIdx + (dx < 0 ? 1 : -1));
+});
 
 // ---------- Télémétrie : simulateur de conduite ----------
 class SimTelemetry {
   constructor() {
-    this.speed = 0;          // km/h
-    this.rpm = 850;          // tr/min (ralenti)
-    this.coolant = 21;       // °C — moteur froid au départ
-    this.fuel = 62;          // %
+    this.speed = 0;
+    this.rpm = 850;
+    this.coolant = 21;
+    this.fuel = 62;
     this._phase = "accel";
     this._target = 90;
   }
-  // Rapports approximatifs d'une TT : vitesse (km/h) -> régime.
   _rpmFor(speed) {
     if (speed < 1) return 850;
     const gears = [[20, 38], [40, 24], [65, 17], [95, 13], [130, 10], [999, 8.2]];
@@ -842,7 +790,6 @@ class SimTelemetry {
     return 850;
   }
   step(dt) {
-    // Cycle de conduite perpétuel.
     if (this._phase === "accel") {
       this.speed += (14 + Math.random() * 6) * dt;
       if (this.speed >= this._target) this._phase = "cruise";
@@ -862,15 +809,11 @@ class SimTelemetry {
       }
     }
     this.speed = Math.max(0, Math.min(230, this.speed));
-    // Le régime suit la vitesse avec un peu d'inertie.
     const target = this._rpmFor(this.speed);
     this.rpm += (target - this.rpm) * Math.min(1, 6 * dt);
-    // Montée en température vers ~90°, consommation lente.
     this.coolant += (90 - this.coolant) * 0.008 * dt * 10;
     this.fuel = Math.max(0, this.fuel - 0.006 * dt * (0.4 + this.rpm / 4000));
-    // Batterie : ~14,2 V alternateur, léger creux au ralenti.
     this.volt = (this.rpm < 1000 ? 13.6 : 14.2) + Math.sin(performance.now() / 900) * 0.06;
-    // Turbo : pousse en accélération, dépression sinon (approximation TFSI).
     const load = this._phase === "accel" ? (this.rpm - 1200) / 5000 : -0.25;
     this.boost = Math.max(-0.6, Math.min(1.2, (this.boost ?? 0) + (load - (this.boost ?? 0)) * 3 * dt));
   }
@@ -886,20 +829,18 @@ class SimTelemetry {
   }
 }
 
-// ---------- Affichage ----------
-const obdEl   = document.getElementById("obd");
-const speedEl = document.getElementById("speedVal");
-const rpmEl   = document.getElementById("rpmVal");
-const rpmFill = document.getElementById("rpmFill");
-const tempEl  = document.getElementById("tempVal");
-const fuelEl  = document.getElementById("fuelVal");
-const tempTile = document.getElementById("tempTile");
-const fuelTile = document.getElementById("fuelTile");
-
-const REDLINE = 6500;
 const sim = new SimTelemetry();
-const speedHistory = [];               // ~60 s à 10 Hz pour la courbe OBD
+const speedHistory = [];
+const REDLINE = 6500;
 let last = performance.now();
+
+// ---------- Éléments ----------
+const el = (id) => document.getElementById(id);
+const carSpeed = el("carSpeed"), carRpm = el("carRpm"), carRpmFill = el("carRpmFill");
+const carTemp = el("carTemp"), carFuel = el("carFuel");
+const obdRpm = el("obdRpm"), oTemp = el("oTemp"), oFuel = el("oFuel");
+const oVolt = el("oVolt"), oBoost = el("oBoost"), obdAlert = el("obdAlert");
+const spark = el("spark");
 
 setInterval(() => {
   const now = performance.now();
@@ -911,157 +852,72 @@ setInterval(() => {
   speedHistory.push(t.speed);
   if (speedHistory.length > 600) speedHistory.shift();
 
-  // Bandeau du bas (écran principal).
-  speedEl.textContent = t.speed;
-  rpmEl.textContent = t.rpm.toLocaleString("fr-FR") + " tr/min";
-  rpmFill.style.width = Math.min(100, (t.rpm / REDLINE) * 100) + "%";
-  tempEl.textContent = t.coolant_temp + "°";
-  fuelEl.textContent = t.fuel + "%";
+  // Section kiTT (dashboard).
+  carSpeed.textContent = t.speed;
+  carRpm.textContent = t.rpm.toLocaleString("fr-FR");
+  carRpmFill.style.width = Math.min(100, (t.rpm / REDLINE) * 100) + "%";
+  carTemp.textContent = t.coolant_temp + "°";
+  carFuel.textContent = t.fuel + "%";
+  const hotWarn = t.coolant_temp > 105, fuelWarn = t.fuel < 15;
+  carTemp.classList.toggle("warn", hotWarn);
+  carFuel.classList.toggle("warn", fuelWarn);
 
-  // Mêmes seuils d'alerte que python/obd.py : surchauffe > 105°, carburant < 15 %.
-  const hotWarn  = t.coolant_temp > 105;
-  const fuelWarn = t.fuel < 15;
-  tempTile.classList.toggle("warn", hotWarn);
-  fuelTile.classList.toggle("warn", fuelWarn);
+  // Section OBD.
+  if (SECTIONS[secIdx] === "obd") {
+    obdRpm.textContent = t.rpm.toLocaleString("fr-FR");
+    oTemp.textContent = t.coolant_temp + " °C";
+    oFuel.textContent = t.fuel + " %";
+    oVolt.textContent = t.volt.toFixed(1) + " V";
+    oBoost.textContent = (t.boost > 0 ? "+" : "") + t.boost.toFixed(2) + " bar";
+    oTemp.parentElement.classList.toggle("warn", hotWarn);
+    oFuel.parentElement.classList.toggle("warn", fuelWarn);
+    const alerts = [];
+    if (hotWarn)  alerts.push("⚠ SURCHAUFFE MOTEUR — " + t.coolant_temp + " °C");
+    if (fuelWarn) alerts.push("⚠ CARBURANT BAS — " + t.fuel + " %");
+    obdAlert.textContent = alerts.join("   ");
 
-  if (currentApp === "appObd") renderObdWindow(t, hotWarn, fuelWarn);
+    const ctx = spark.getContext("2d");
+    const w = spark.clientWidth, h = spark.clientHeight;
+    if (spark.width !== w) { spark.width = w; spark.height = h; }
+    ctx.clearRect(0, 0, w, h);
+    ctx.strokeStyle = "#24e5ff";
+    ctx.lineWidth = 1.5;
+    ctx.shadowColor = "#24e5ff";
+    ctx.shadowBlur = 6;
+    ctx.beginPath();
+    const n = speedHistory.length;
+    for (let i = 0; i < n; i++) {
+      const x = (i / Math.max(1, n - 1)) * w;
+      const y = h - (speedHistory[i] / 230) * (h - 6) - 3;
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    }
+    ctx.stroke();
+  }
+
   navStep(t, dt);
 }, 100);
 
-// ============================================================
-//  App OBD : jauge régime, courbe vitesse, grille de mesures
-// ============================================================
-const ARC_LEN = 251.3;                 // longueur du demi-cercle SVG
-const rpmArc    = document.getElementById("rpmArc");
-const rpmArcVal = document.getElementById("rpmArcVal");
-const spark     = document.getElementById("spark");
-const sparkNow  = document.getElementById("sparkNow");
-const oTemp  = document.getElementById("oTemp");
-const oFuel  = document.getElementById("oFuel");
-const oVolt  = document.getElementById("oVolt");
-const oBoost = document.getElementById("oBoost");
-const obdAlerts = document.getElementById("obdAlerts");
+// ---------- Section Nav : guidage ----------
+const navBanner = el("navBanner"), navEta = el("navEta");
+let navDist = 4.2, navStreet = "Rue du Turbo";
 
-function renderObdWindow(t, hotWarn, fuelWarn) {
-  rpmArc.style.strokeDashoffset = ARC_LEN * (1 - Math.min(1, t.rpm / REDLINE));
-  rpmArcVal.innerHTML = t.rpm.toLocaleString("fr-FR") + "<small>tr/min</small>";
-
-  // Courbe de vitesse (60 dernières secondes).
-  const ctx = spark.getContext("2d");
-  const w = spark.clientWidth, h = spark.clientHeight;
-  if (spark.width !== w) { spark.width = w; spark.height = h; }
-  ctx.clearRect(0, 0, w, h);
-  ctx.strokeStyle = "#24e5ff";
-  ctx.lineWidth = 1.5;
-  ctx.shadowColor = "#24e5ff";
-  ctx.shadowBlur = 6;
-  ctx.beginPath();
-  const n = speedHistory.length;
-  for (let i = 0; i < n; i++) {
-    const x = (i / Math.max(1, n - 1)) * w;
-    const y = h - (speedHistory[i] / 230) * (h - 6) - 3;
-    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
-  }
-  ctx.stroke();
-  sparkNow.textContent = t.speed + " km/h";
-
-  oTemp.textContent  = t.coolant_temp + " °C";
-  oFuel.textContent  = t.fuel + " %";
-  oVolt.textContent  = t.volt.toFixed(1) + " V";
-  oBoost.textContent = (t.boost > 0 ? "+" : "") + t.boost.toFixed(2) + " bar";
-
-  const alerts = [];
-  if (hotWarn)  alerts.push("SURCHAUFFE MOTEUR — temp. eau " + t.coolant_temp + " °C");
-  if (fuelWarn) alerts.push("CARBURANT BAS — " + t.fuel + " % restant");
-  obdAlerts.innerHTML = alerts.length
-    ? alerts.map(a => `<span class="alert">⚠ ${a}</span>`).join("<br>")
-    : "Aucune alerte — tous les paramètres sont nominaux.";
-}
-
-// ============================================================
-//  App Navigation : carte néon animée, guidage, destinations
-// ============================================================
-const navMap    = document.getElementById("navMap");
-const navBanner = document.getElementById("navBanner");
-const navEta    = document.getElementById("navEta");
-let navDist   = 4.2;                  // km restants
-let navStreet = "Rue du Turbo";
-let navScroll = 0;
-
-for (const mi of document.querySelectorAll("#winNav .mi")) {
-  mi.addEventListener("click", () => {
-    document.querySelector("#winNav .mi.on")?.classList.remove("on");
-    mi.classList.add("on");
-    navDist = Number(mi.dataset.dist);
-    navStreet = mi.dataset.street;
+for (const b of document.querySelectorAll("#sec-nav .dests button")) {
+  b.addEventListener("click", () => {
+    document.querySelector("#sec-nav .dests button.on")?.classList.remove("on");
+    b.classList.add("on");
+    navDist = Number(b.dataset.dist);
+    navStreet = b.dataset.street;
   });
 }
 
-function navResize() {
-  navMap.width = navMap.clientWidth;
-  navMap.height = navMap.clientHeight;
-}
-addEventListener("resize", () => { if (currentApp === "appNav") navResize(); });
-
 function navStep(t, dt) {
-  // La distance fond avec la vitesse simulée, même fenêtre fermée.
   navDist = Math.max(0, navDist - (t.speed * dt) / 3600);
-  if (currentApp !== "appNav") return;
-
-  navScroll += t.speed * dt * 2.2;     // défilement de la carte lié à la vitesse
-
-  const w = navMap.width, h = navMap.height;
-  if (!w || !h) return;
-  const ctx = navMap.getContext("2d");
-  ctx.fillStyle = "#0a0118";
-  ctx.fillRect(0, 0, w, h);
-
-  // Grille urbaine qui défile vers le bas (on "roule" vers le haut de la carte).
-  ctx.strokeStyle = "rgba(255,45,149,.28)";
-  ctx.lineWidth = 1;
-  const cell = 56;
-  const off = navScroll % cell;
-  for (let y = -cell + off; y < h + cell; y += cell) {
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
-  }
-  for (let x = 0; x < w; x += cell) {
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
-  }
-
-  // Itinéraire : remonte tout droit puis oblique vers la droite (le prochain virage).
-  const cx = w * 0.5, turnY = h * 0.32;
-  ctx.strokeStyle = "#24e5ff";
-  ctx.lineWidth = 5;
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-  ctx.shadowColor = "#24e5ff";
-  ctx.shadowBlur = 14;
-  ctx.beginPath();
-  ctx.moveTo(cx, h * 0.86);
-  ctx.lineTo(cx, turnY);
-  ctx.lineTo(w * 0.78, turnY * 0.55);
-  ctx.stroke();
-  ctx.shadowBlur = 0;
-
-  // La voiture (chevron) en bas de l'itinéraire.
-  ctx.fillStyle = "#fff";
-  ctx.shadowColor = "#ff2d95";
-  ctx.shadowBlur = 12;
-  ctx.beginPath();
-  ctx.moveTo(cx, h * 0.83);
-  ctx.lineTo(cx - 9, h * 0.88);
-  ctx.lineTo(cx, h * 0.862);
-  ctx.lineTo(cx + 9, h * 0.88);
-  ctx.closePath();
-  ctx.fill();
-  ctx.shadowBlur = 0;
-
-  // Guidage + ETA.
+  if (SECTIONS[secIdx] !== "nav") return;
   const arrived = navDist <= 0.005;
   const turnIn = Math.max(0, Math.round(Math.min(navDist * 1000, 400) / 10) * 10);
   navBanner.textContent = arrived
     ? "🏁 Vous êtes arrivé"
-    : `↱ Dans ${turnIn} m, tourne à droite — ${navStreet}`;
+    : `↱ ${turnIn} m — ${navStreet}`;
   const etaMin = t.speed > 3 ? (navDist / t.speed) * 60 : navDist * 1.2;
   navEta.innerHTML = arrived
     ? "Destination atteinte"
@@ -1069,9 +925,7 @@ function navStep(t, dt) {
         new Date(Date.now() + etaMin * 60000).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`;
 }
 
-// ============================================================
-//  App Audio : playlist, lecture simulée
-// ============================================================
+// ---------- Section Audio ----------
 const TRACKS = [
   { t: "Night Drive",   a: "Volt Runner",   d: 214 },
   { t: "Turbo Boost",   a: "Chrome Coupé",  d: 189 },
@@ -1080,22 +934,18 @@ const TRACKS = [
 ];
 let trackIdx = 0, playing = false, tPos = 0;
 
-const audioMenu   = document.querySelector("#winAudio .menu");
-const trackTitle  = document.getElementById("trackTitle");
-const trackArtist = document.getElementById("trackArtist");
-const audioFill   = document.getElementById("audioFill");
-const tCur = document.getElementById("tCur");
-const tEnd = document.getElementById("tEnd");
-const btnPlay = document.getElementById("btnPlay");
+const playlist = document.querySelector("#sec-audio .playlist");
+const trackTitle = el("trackTitle"), trackArtist = el("trackArtist");
+const audioFill = el("audioFill"), tCur = el("tCur"), tEnd = el("tEnd");
+const btnPlay = el("btnPlay");
 
 const fmt = (s) => Math.floor(s / 60) + ":" + String(Math.floor(s % 60)).padStart(2, "0");
 
 TRACKS.forEach((tr, i) => {
   const b = document.createElement("button");
-  b.className = "mi";
-  b.innerHTML = `${tr.t}<small>${tr.a} — ${fmt(tr.d)}</small>`;
+  b.textContent = tr.t;
   b.addEventListener("click", () => { loadTrack(i); playing = true; syncPlayUI(); });
-  audioMenu.appendChild(b);
+  playlist.appendChild(b);
 });
 
 function loadTrack(i) {
@@ -1105,19 +955,18 @@ function loadTrack(i) {
   trackTitle.textContent = tr.t;
   trackArtist.textContent = tr.a;
   tEnd.textContent = fmt(tr.d);
-  audioMenu.querySelectorAll(".mi").forEach((b, j) =>
-    b.classList.toggle("on", j === trackIdx));
+  playlist.querySelectorAll("button").forEach((b, j) => b.classList.toggle("on", j === trackIdx));
 }
 function syncPlayUI() { btnPlay.textContent = playing ? "⏸" : "▶"; }
 
 btnPlay.addEventListener("click", () => { playing = !playing; syncPlayUI(); });
-document.getElementById("btnPrev").addEventListener("click", () => loadTrack(trackIdx - 1));
-document.getElementById("btnNext").addEventListener("click", () => loadTrack(trackIdx + 1));
+el("btnPrev").addEventListener("click", () => loadTrack(trackIdx - 1));
+el("btnNext").addEventListener("click", () => loadTrack(trackIdx + 1));
 
 setInterval(() => {
   if (playing) {
     tPos += 0.25;
-    if (tPos >= TRACKS[trackIdx].d) loadTrack(trackIdx + 1);   // enchaîne
+    if (tPos >= TRACKS[trackIdx].d) loadTrack(trackIdx + 1);
   }
   audioFill.style.width = (tPos / TRACKS[trackIdx].d) * 100 + "%";
   tCur.textContent = fmt(tPos);
