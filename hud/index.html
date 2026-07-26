@@ -499,8 +499,8 @@ controls.dampingFactor = 0.08;
 controls.enablePan = false;
 controls.autoRotate = true;
 controls.autoRotateSpeed = 1.2;
-controls.minPolarAngle = 0.95;         // on reste entre plongée légère…
-controls.maxPolarAngle = 1.45;         // …et quasi-profil
+controls.minPolarAngle = 0.5;          // assez haut pour la vue "carte" (app Nav)…
+controls.maxPolarAngle = 1.45;         // …jusqu'au quasi-profil
 controls.minZoom = 0.5; controls.maxZoom = 3;
 
 // Un doigt sur l'écran stoppe la rotation ; elle reprend 3 s après.
@@ -513,6 +513,50 @@ controls.addEventListener("end", () => {
   clearTimeout(resumeTimer);
   resumeTimer = setTimeout(() => { controls.autoRotate = true; }, 3000);
 });
+
+// ---------- Vols de caméra : transitions voiture <-> fenêtres ----------
+// Chaque app cadre la voiture sous l'angle qui lui "parle" : l'OBD montre
+// l'avant (le moteur), la Nav prend de la hauteur (vue carte), l'Audio se
+// pose en profil rapproché. Fermer une fenêtre ramène l'iso par défaut.
+const VIEWS = {
+  default:  { theta: Math.PI / 4,           phi: Math.PI / 2 - ISO_ELEV, zoom: 1.0 },
+  appNav:   { theta: Math.PI / 4,           phi: 0.58, zoom: 0.82 },
+  appAudio: { theta: 0.06,                  phi: 1.32, zoom: 1.28 },
+  appObd:   { theta: Math.PI / 4 + Math.PI, phi: 1.22, zoom: 1.18 },
+};
+let flight = null;
+const _sph = new THREE.Spherical();
+
+window.__kittFly = (name) => {
+  const v = VIEWS[name] || VIEWS.default;
+  flight = { ...v, resume: name === "default" };   // l'auto-rotation ne reprend qu'en vue par défaut
+  controls.autoRotate = false;
+  clearTimeout(resumeTimer);
+};
+// Un doigt posé pendant le vol : l'utilisateur reprend la main.
+controls.addEventListener("start", () => { flight = null; });
+
+const wrapAngle = (a) => ((a + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
+
+function stepFlight(dt) {
+  if (!flight) return;
+  _sph.setFromVector3(camera.position);
+  const k = 1 - Math.exp(-4.5 * dt);               // glissement exponentiel, sans à-coups
+  const dTheta = wrapAngle(flight.theta - _sph.theta);
+  const dPhi   = flight.phi  - _sph.phi;
+  const dZoom  = flight.zoom - camera.zoom;
+  _sph.theta += dTheta * k;
+  _sph.phi   += dPhi * k;
+  _sph.radius = 10;
+  camera.position.setFromSpherical(_sph);
+  camera.lookAt(0, 0, 0);
+  camera.zoom += dZoom * k;
+  camera.updateProjectionMatrix();
+  if (Math.abs(dTheta) < 0.01 && Math.abs(dPhi) < 0.01 && Math.abs(dZoom) < 0.01) {
+    if (flight.resume) controls.autoRotate = true;
+    flight = null;
+  }
+}
 
 // ---------- Sol ----------
 function circlePoints(radius, y = 0, segments = 128) {
@@ -696,7 +740,7 @@ function loadCar(chain) {
 
       statusEl.textContent = "toucher pour orienter";
       setTimeout(() => (statusEl.style.opacity = 0), 4000);
-      window.__kitt = { scene, camera, controls, carGroup, renderer, composer };
+      window.__kitt = { scene, camera, controls, carGroup, renderer, composer, stepFlight };
     },
     undefined,
     () => loadCar(chain.slice(1))     // repli sur le modèle suivant
@@ -705,7 +749,12 @@ function loadCar(chain) {
 loadCar(modelChain);
 
 // ---------- Boucle ----------
+let prevT = performance.now();
 renderer.setAnimationLoop(() => {
+  const now = performance.now();
+  const dt = Math.min(0.1, (now - prevT) / 1000);
+  prevT = now;
+  stepFlight(dt);
   controls.update();
   if (composer) composer.render();
   else renderer.render(scene, camera);
@@ -767,6 +816,8 @@ function selectApp(id) {
   }
   // Le bandeau OBD du bas n'a de sens que sur l'écran principal.
   document.getElementById("obd").style.display = currentApp ? "none" : "flex";
+  // La caméra vole vers la vue qui correspond à l'app.
+  window.__kittFly?.(id === "appCar" ? "default" : id);
 }
 for (const btn of document.querySelectorAll("#dock button"))
   btn.addEventListener("click", () => selectApp(btn.id));

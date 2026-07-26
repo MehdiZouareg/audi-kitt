@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "hud",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["hud/serve.py", "8420"],
+      "port": 8420
+    }
+  ]
+}
