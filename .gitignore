@@ -3,3 +3,11 @@ __pycache__/
 anim_sim
 *.o
 .DS_Store
+
+# Secrets
+.env
+
+# HUD : capture de debug + modeles intermediaires (seul le v5 est versionne)
+hud/capture.jpg
+hud/assets/tt_mk2_v3.glb
+hud/assets/tt_mk2_v4.glb
