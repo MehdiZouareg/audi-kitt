@@ -1,0 +1,97 @@
+# ============================================================
+#  Audi kiTT — Manifeste App Lab (Arduino UNO Q)      app.yaml
+# ============================================================
+#  Decrit l'application "double cerveau" :
+#    - un SKETCH qui tourne sur le MCU (STM32) et pilote la matrice LED,
+#    - une APP PYTHON qui tourne sur le MPU Linux (Qualcomm) et decide
+#      de l'etat de l'IA,
+#    - le LIEN serie (Router Bridge) qui relie les deux.
+#
+#  NB : la structure exacte des cles App Lab reste a confirmer sur la
+#  carte (cf. bloqueur "Toolchain de deploiement" dans la roadmap).
+#  Ce fichier est volontairement explicite et commente pour servir de
+#  base ajustable une fois l'acces a la carte disponible.
+# ============================================================
+
+name: audi-kitt
+version: 0.12.0
+description: >
+  IA embarquee "kiTT" pour Audi TT. Le MPU Linux decide de l'etat de
+  l'assistant ; le MCU affiche cet etat sur la matrice LED 13x8 integree,
+  avec transitions douces, luminosite globale jour/nuit, texte defilant,
+  jauge persistante, nombre persistant et un dashboard combine (nombre +
+  jauge sur un meme ecran) pour la telemetrie glancable. La brique
+  telemetrie OBD-II (decodage des PID + logique de seuils/alertes) tourne
+  cote Linux (python/obd.py) et pilote ce dashboard : ex. vitesse OBD
+  affichee simultanement en valeur chiffree exacte ET en barre de
+  proportion, avec alerte defilante en cas de surchauffe / carburant bas,
+  et escalade sur l'ecran ERROR si une alerte persiste (#11). La grandeur
+  montree au cadran est basculable par rotation (vitesse/RPM/temp/carbu).
+  La brique VOIX (python/voice.py, #12) fournit la couche d'affichage de
+  l'assistant vocal : reconnaissance tolerante du wake-word "kiTT",
+  conversion amplitude micro/TTS -> niveau d'animation, et une machine a
+  etats qui pousse LISTEN/THINK/SPEAK/IDLE (+ barge-in et ecran ERROR sur
+  echec) au fil d'une interaction parlee, sans nouvelle commande protocole.
+  La brique INTENTIONS (python/intents.py, #13) transforme le texte reconnu
+  par le STT en commandes concretes (montrer une grandeur OBD, changer de
+  focus, regler la luminosite / mode nuit-jour, se mettre en veille) et
+  laisse tout le reste (UNKNOWN) a un futur LLM. Enfin le SERVICE
+  d'orchestration (python/service.py, #14) assemble ces briques en une
+  application vivante : un point d'entree unique feed_stt() (wake-word +
+  commande dans la meme phrase), le tour de parole complet STT -> intention
+  ou LLM -> reponse parlee (S:SPEAK), le pilotage telemetrie, le dimming
+  jour/nuit synchronise, une boucle d'evenements avec arret propre
+  (SIGINT/SIGTERM) et un garde-fou (watchdog) qui rattrape les exceptions
+  sans jamais figer l'afficheur.
+
+# --- Partie MCU (temps reel, pilote la matrice LED) ---
+sketch:
+  path: sketch/kiTT_display
+  main: kiTT_display.ino
+  # FQBN a confirmer sur la carte (arduino-cli board list / App Lab).
+  # fqbn: arduino:stm32:unoq   # <-- a verifier
+  libraries:
+    - Arduino_LED_Matrix
+
+# --- Partie MPU Linux (logique haut niveau) ---
+python:
+  path: python
+  entrypoint: service.py
+  # Modules Linux :
+  #   main.py    : facade KittDisplay + protocole serie + scenario demo
+  #   obd.py     : telemetrie OBD-II (decodage PID + seuils/alertes +
+  #                escalade ERROR + rotation du focus)               [#10,#11]
+  #   voice.py   : assistant vocal (wake-word "kiTT" + amplitude->niveau +
+  #                machine a etats d'affichage LISTEN/THINK/SPEAK/IDLE) [#12]
+  #   intents.py : reconnaissance d'intentions + routage des commandes
+  #                voiture vers OBD/afficheur/voix (le reste -> LLM)    [#13]
+  #   service.py : orchestrateur — assemble main/obd/voice/intents en une
+  #                app (feed_stt, tour de parole -> LLM, boucle d'evenements,
+  #                watchdog, arret propre). C'est l'ENTRYPOINT.        [#14]
+  #   test_main.py : tests protocole + telemetrie + voix + intentions +
+  #                  orchestrateur (102 tests, sans carte)
+  # Dependances Linux ; pyserial est optionnel (dry-run si absent).
+  requirements:
+    - pyserial>=3.5
+
+# --- Liaison MPU <-> MCU (Router Bridge expose comme un port serie) ---
+bridge:
+  transport: serial
+  baud: 115200
+  newline: "\n"
+  # Le device cote Linux depend du pont App Lab ; main.py auto-detecte
+  # une liste de candidats et accepte --port pour forcer.
+  protocol:
+    # Documente le protocole applicatif (source de verite : kiTT_anim.h).
+    - "S:<ETAT>          -> BOOT|IDLE|LISTEN|THINK|SPEAK|WORD|ERROR"
+    - "L:<0-255>         -> niveau de modulation (amplitude voix/micro)"
+    - "B:<0-255>         -> luminosite globale de l'afficheur (255 = plein jour)"
+    - "T:<message>       -> fait defiler <message> une fois puis revient a IDLE"
+    - "G:<0-255>         -> jauge persistante (barre) : affiche une valeur en continu"
+    - "N:<0-999>         -> nombre persistant (chiffres) : valeur exacte en continu"
+    - "D:<0-999>,<0-255> -> dashboard persistant : nombre (haut) + jauge (bas)"
+    - "P                 -> ping (le MCU repond 'kiTT ok')"
+  # NB : la telemetrie OBD (#10), sa politique d'affichage (#11), l'assistant
+  # vocal (#12), la couche d'intentions (#13) et l'orchestrateur (#14) ne
+  # rajoutent AUCUNE commande protocole : ils reutilisent les etats/commandes
+  # existants via les facades. Le service se contente de coordonner les briques.
