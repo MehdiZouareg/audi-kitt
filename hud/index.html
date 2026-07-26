@@ -146,20 +146,65 @@
     font-size: 22px; font-weight: 300;
   }
   #sec-nav .eta b { color: var(--neon-cyan); font-weight: 600; }
-  #sec-nav .dests {
-    position: absolute; left: 100px; top: 50%; transform: translateY(-50%);
-    display: flex; flex-direction: column; gap: 8px;
+  /* Recherche d'adresse */
+  #sec-nav .search {
+    position: absolute; left: 100px; top: 110px; width: min(34%, 340px);
   }
-  #sec-nav .dests button {
-    background: none; border: none; text-align: left;
-    color: rgba(255,233,251,.55);
-    font: inherit; font-size: 19px; font-weight: 300;
-    padding: 6px 0; cursor: pointer;
-    transition: color .2s, text-shadow .2s;
+  #navQ {
+    width: 100%; box-sizing: border-box;
+    background: rgba(16,4,34,.6);
+    border: 1px solid rgba(255,45,149,.35);
+    border-radius: 12px;
+    color: #fff; font: inherit; font-size: 16px;
+    padding: 12px 16px; outline: none;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    caret-color: var(--neon-cyan);
   }
-  #sec-nav .dests button small { font-size: 11px; margin-left: 10px; color: rgba(255,233,251,.35); }
-  #sec-nav .dests button.on {
-    color: #fff; text-shadow: 0 0 10px var(--neon-cyan);
+  #navQ:focus, #navQ.on { border-color: var(--neon-cyan); box-shadow: 0 0 12px rgba(36,229,255,.3); }
+  #navResults { display: flex; flex-direction: column; margin-top: 8px; }
+  #navResults button {
+    background: rgba(16,4,34,.55); border: none;
+    border-bottom: 1px solid rgba(255,45,149,.15);
+    color: rgba(255,233,251,.85); text-align: left;
+    font: inherit; font-size: 14px; line-height: 1.35;
+    padding: 11px 14px; cursor: pointer;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  #navResults button:first-child { border-radius: 12px 12px 0 0; }
+  #navResults button:last-child { border-radius: 0 0 12px 12px; border-bottom: none; }
+  #navResults button:active { color: #fff; background: rgba(36,229,255,.15); }
+  #navResults button small { display: block; font-size: 11px; color: rgba(255,233,251,.45); }
+
+  /* Clavier tactile : grosses touches, bas d'écran */
+  #kbd {
+    position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%);
+    display: flex; flex-direction: column; gap: 7px;
+    padding: 12px;
+    background: rgba(10,2,24,.72);
+    border: 1px solid rgba(255,45,149,.3);
+    border-radius: 18px;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+  #kbd[hidden] { display: none; }
+  #kbd .row { display: flex; gap: 7px; justify-content: center; }
+  #kbd button {
+    min-width: 52px; height: 52px;
+    border: none; border-radius: 10px;
+    background: rgba(255,255,255,.07);
+    color: #ffe9fb; font: inherit; font-size: 19px;
+    cursor: pointer;
+    transition: background .1s, transform .05s;
+  }
+  #kbd button:active { background: rgba(36,229,255,.3); transform: scale(.94); }
+  #kbd button.wide { min-width: 84px; font-size: 14px; }
+  #kbd button.space { min-width: 220px; }
+  #kbd button.go {
+    background: rgba(36,229,255,.18);
+    border: 1px solid var(--neon-cyan);
+    box-shadow: 0 0 10px rgba(36,229,255,.25);
   }
 
   /* --- Section Audio --- */
@@ -251,18 +296,16 @@
   </div>
 </section>
 
-<!-- ===== Section Nav : la scène EST la carte (vue de haut + itinéraire au sol) ===== -->
+<!-- ===== Section Nav : la scène EST la carte (ville OSM + itinéraire au sol) ===== -->
 <section class="sec" id="sec-nav">
   <div class="banner">
-    <div class="huge" id="navBanner">↱ …</div>
+    <div class="huge" id="navBanner">chargement de la carte…</div>
   </div>
-  <div class="dests">
-    <div class="label" style="margin-bottom:8px">Destinations</div>
-    <button class="on" data-dist="4.2"  data-street="Rue du Turbo">Maison<small>4,2 km</small></button>
-    <button data-dist="12.8" data-street="Av. Quattro">Travail<small>12,8 km</small></button>
-    <button data-dist="1.1"  data-street="Bd. des Anneaux">Station-service<small>1,1 km</small></button>
-    <button data-dist="187"  data-street="A11 — Ouest">Circuit du Mans<small>187 km</small></button>
+  <div class="search touch">
+    <input id="navQ" type="text" placeholder="🔍 Rechercher une adresse…" readonly>
+    <div id="navResults"></div>
   </div>
+  <div id="kbd" class="touch" hidden><!-- rempli par le script --></div>
   <div class="eta" id="navEta">—</div>
 </section>
 
@@ -322,7 +365,7 @@ import * as THREE from "three";
 import { OrbitControls }   from "three/addons/controls/OrbitControls.js";
 import { GLTFLoader }      from "three/addons/loaders/GLTFLoader.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
-import { mergeVertices }   from "three/addons/utils/BufferGeometryUtils.js";
+import { mergeVertices, mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { EffectComposer }  from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass }      from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
@@ -435,7 +478,7 @@ controls.enablePan = false;
 controls.enableZoom = false;           // la molette sert à changer de section
 controls.autoRotate = true;
 controls.autoRotateSpeed = 1.2;
-controls.minPolarAngle = 0.35;         // assez haut pour la vue "carte" (Nav)…
+controls.minPolarAngle = 0.28;         // assez haut pour la vue "carte" (Nav)…
 controls.maxPolarAngle = 1.45;         // …jusqu'au quasi-profil
 
 // Un doigt sur l'écran stoppe la rotation ; elle reprend 3 s après.
@@ -453,18 +496,23 @@ controls.addEventListener("end", () => {
 // Chaque section cadre la voiture sous son angle : le dashboard en iso,
 // la Nav en plongée (la scène devient la carte), l'Audio en profil,
 // l'OBD sur la face avant (le moteur).
+// `car` = facteur d'échelle de la voiture : en Nav elle rétrécit façon
+// marqueur GPS pendant que la caméra dé-zoome sur la ville OSM.
 const VIEWS = {
-  car:   { theta: Math.PI / 4,           phi: Math.PI / 2 - ISO_ELEV, zoom: 1.0,  rotate: true  },
-  nav:   { theta: Math.PI / 4,           phi: 0.42, zoom: 0.78, rotate: false },
-  audio: { theta: 0.06,                  phi: 1.32, zoom: 1.22, rotate: false },
-  obd:   { theta: Math.PI / 4 + Math.PI, phi: 1.22, zoom: 1.12, rotate: false },
+  car:   { theta: Math.PI / 4,           phi: Math.PI / 2 - ISO_ELEV, zoom: 1.0,  car: 1.0,  rotate: true  },
+  nav:   { theta: 0.0,                   phi: 0.3,  zoom: 0.16, car: 0.34, rotate: false },
+  audio: { theta: 0.06,                  phi: 1.32, zoom: 1.22, car: 1.0,  rotate: false },
+  obd:   { theta: Math.PI / 4 + Math.PI, phi: 1.22, zoom: 1.12, car: 1.0,  rotate: false },
 };
 let flight = null;
+let carFactorTarget = 1.0;
+let carFactor = 1.0;
 const _sph = new THREE.Spherical();
 
 window.__kittFly = (name) => {
   const v = VIEWS[name] || VIEWS.car;
   flight = { ...v };
+  carFactorTarget = v.car;
   controls.autoRotate = false;
   clearTimeout(resumeTimer);
 };
@@ -473,9 +521,12 @@ controls.addEventListener("start", () => { flight = null; });
 const wrapAngle = (a) => ((a + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
 
 function stepFlight(dt) {
+  const k = 1 - Math.exp(-4.5 * dt);               // glissement exponentiel, sans à-coups
+  // L'échelle de la voiture se lisse en permanence (même hors vol).
+  carFactor += (carFactorTarget - carFactor) * k;
+  carRig.scale.setScalar(carFactor);
   if (!flight) return;
   _sph.setFromVector3(camera.position);
-  const k = 1 - Math.exp(-4.5 * dt);               // glissement exponentiel, sans à-coups
   const dTheta = wrapAngle(flight.theta - _sph.theta);
   const dPhi   = flight.phi  - _sph.phi;
   const dZoom  = flight.zoom - camera.zoom;
@@ -529,44 +580,132 @@ if (SYNTH) {
   scene.add(mk(2.6, 0.18), mk(2.75, 0.07));
 }
 
-// ---------- Itinéraire Nav : tracé néon au sol, visible en vue carte ----------
-// La section Nav ne dessine pas de carte à part : la caméra prend de la
-// hauteur et l'itinéraire apparaît DANS la scène, au sol, devant la voiture.
-const routeGroup = new THREE.Group();
-{
-  const pts = [
-    new THREE.Vector3( 2.4, 0.03,  2.4),
-    new THREE.Vector3( 0.0, 0.03,  0.0),
-    new THREE.Vector3(-1.7, 0.03, -1.7),
-    new THREE.Vector3(-0.4, 0.03, -3.4),
-    new THREE.Vector3( 1.8, 0.03, -4.6),
-  ];
-  const curve = new THREE.CatmullRomCurve3(pts);
-  const routeGeo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(80));
-  routeGroup.add(new THREE.Line(routeGeo, new THREE.LineBasicMaterial({
-    color: NEON_CYAN, transparent: true, opacity: 0 })));
-  // Destination : petit anneau au bout du tracé.
-  const end = pts[pts.length - 1];
-  const ring = new THREE.Line(
-    new THREE.BufferGeometry().setFromPoints(circlePoints(0.28, 0, 48)),
-    new THREE.LineBasicMaterial({ color: NEON_CYAN, transparent: true, opacity: 0 }));
-  ring.position.copy(end);
-  routeGroup.add(ring);
-}
+// ---------- Ville OSM : la scène devient la carte en section Nav ----------
+// Les données viennent d'Overpass via le proxy /osm de serve.py :
+// bâtiments extrudés (masse sombre + arêtes néon) et routes au sol,
+// fusionnés en géométries uniques pour tenir le budget de rendu.
+// Échelle : 1 unité scène = 8 m réels (la TT fait ~4 unités → le facteur
+// `car` de la vue Nav la réduit en marqueur GPS).
+const M_PER_UNIT = 8;
+const mapGroup = new THREE.Group();
+mapGroup.visible = false;
+scene.add(mapGroup);
+
+const routeGroup = new THREE.Group();   // itinéraire par-dessus la ville
 scene.add(routeGroup);
 let routeTarget = 0;                    // opacité cible (1 en section Nav)
-window.__kittRoute = (visible) => { routeTarget = visible ? 1 : 0; };
+
+let mapCenter = null;                   // {lat, lon} du centre chargé
+function toLocal(lat, lon) {
+  const kx = 111320 * Math.cos(mapCenter.lat * Math.PI / 180) / M_PER_UNIT;
+  const kz = 110540 / M_PER_UNIT;
+  return [ (lon - mapCenter.lon) * kx, -(lat - mapCenter.lat) * kz ];
+}
+
+function buildCity(osm) {
+  // Nettoie un éventuel chargement précédent.
+  while (mapGroup.children.length) mapGroup.remove(mapGroup.children[0]);
+
+  const buildingGeos = [];
+  const majorPts = [], minorPts = [];
+  const MAJOR = /^(motorway|trunk|primary|secondary|tertiary)/;
+
+  for (const el of osm.elements ?? []) {
+    if (el.type !== "way" || !el.geometry) continue;
+    const tags = el.tags ?? {};
+
+    if (tags.building) {
+      const pts = el.geometry.map(g => toLocal(g.lat, g.lon));
+      if (pts.length < 3) continue;
+      const shape = new THREE.Shape();
+      shape.moveTo(pts[0][0], -pts[0][1]);
+      for (let i = 1; i < pts.length; i++) shape.lineTo(pts[i][0], -pts[i][1]);
+      const h = (parseFloat(tags.height) || (parseFloat(tags["building:levels"]) || 3) * 3) / M_PER_UNIT;
+      try {
+        const geo = new THREE.ExtrudeGeometry(shape, { depth: h, bevelEnabled: false });
+        geo.rotateX(-Math.PI / 2);      // XY du plan -> sol XZ, profondeur -> hauteur Y
+        buildingGeos.push(geo);
+      } catch { /* footprint dégénéré : on ignore */ }
+    } else if (tags.highway) {
+      const bucket = MAJOR.test(tags.highway) ? majorPts : minorPts;
+      const pts = el.geometry.map(g => toLocal(g.lat, g.lon));
+      for (let i = 1; i < pts.length; i++) {
+        bucket.push(new THREE.Vector3(pts[i-1][0], 0.02, pts[i-1][1]),
+                    new THREE.Vector3(pts[i][0],   0.02, pts[i][1]));
+      }
+    }
+  }
+
+  // Bâtiments : une seule masse sombre + un seul paquet d'arêtes néon.
+  if (buildingGeos.length) {
+    const merged = mergeGeometries(buildingGeos, false);
+    mapGroup.add(new THREE.Mesh(merged, new THREE.MeshBasicMaterial({
+      color: 0x0d0322,
+      polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 })));
+    const edges = mergeGeometries(buildingGeos.map(g => new THREE.EdgesGeometry(g, 30)), false);
+    mapGroup.add(new THREE.LineSegments(edges, new THREE.LineBasicMaterial({
+      color: NEON_PINK, transparent: true, opacity: 0.35 })));
+    buildingGeos.forEach(g => g.dispose());
+  }
+  const mkRoads = (pts, color, opacity) => {
+    if (!pts.length) return;
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    mapGroup.add(new THREE.LineSegments(geo, new THREE.LineBasicMaterial({
+      color, transparent: true, opacity })));
+  };
+  mkRoads(majorPts, NEON_CYAN, 0.5);
+  mkRoads(minorPts, 0xffffff, 0.14);
+}
+
+window.__kittMap = {
+  async load(lat, lon, r = 600) {
+    mapCenter = { lat, lon };
+    const res = await fetch(`/osm?lat=${lat}&lon=${lon}&r=${r}`);
+    const osm = await res.json();
+    if (osm.error) throw new Error(osm.error);
+    buildCity(osm);
+    return osm.elements?.length ?? 0;
+  },
+  toLocal: (lat, lon) => toLocal(lat, lon),
+  center: () => mapCenter,
+  setRoute(coords) {                    // coords = [[lon, lat], ...] (GeoJSON OSRM)
+    while (routeGroup.children.length) routeGroup.remove(routeGroup.children[0]);
+    if (!coords?.length) return;
+    const pts = coords.map(([lon, lat]) => {
+      const [x, z] = toLocal(lat, lon);
+      return new THREE.Vector3(x, 0.05, z);
+    });
+    const line = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(pts),
+      new THREE.LineBasicMaterial({ color: NEON_CYAN, transparent: true, opacity: 0 }));
+    line.userData.max = 0.95;
+    const ring = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(circlePoints(1.2, 0, 48)),
+      new THREE.LineBasicMaterial({ color: NEON_CYAN, transparent: true, opacity: 0 }));
+    ring.position.copy(pts[pts.length - 1]);
+    ring.userData.max = 0.7;
+    routeGroup.add(line, ring);
+  },
+  show(visible) {
+    mapGroup.visible = visible;
+    routeTarget = visible ? 1 : 0;
+  },
+};
+
 function stepRoute(dt) {
   const k = 1 - Math.exp(-6 * dt);
   for (const child of routeGroup.children) {
     const m = child.material;
-    m.opacity += ((child.userData.max ?? (child.userData.max = m === routeGroup.children[0].material ? 0.85 : 0.6)) * routeTarget - m.opacity) * k;
+    m.opacity += ((child.userData.max ?? 0.85) * routeTarget - m.opacity) * k;
   }
 }
 
 // ---------- Voiture ----------
+// carRig = enveloppe d'échelle (marqueur GPS en Nav) ; carGroup = le modèle.
+const carRig = new THREE.Group();
 const carGroup = new THREE.Group();
-scene.add(carGroup);
+carRig.add(carGroup);
+scene.add(carRig);
 
 const edgeMat = new THREE.LineBasicMaterial({
   color: 0xffffff, transparent: true, opacity: 0.9,
@@ -740,7 +879,7 @@ function setSection(idx) {
   document.querySelectorAll("#dock button").forEach(b => b.classList.toggle("on", b.dataset.sec === name));
   document.querySelectorAll("#pager i").forEach((p, i) => p.classList.toggle("on", i === secIdx));
   window.__kittFly?.(name);
-  window.__kittRoute?.(name === "nav");
+  window.__kittMap?.show(name === "nav");
 }
 for (const btn of document.querySelectorAll("#dock button"))
   btn.addEventListener("click", () => setSection(SECTIONS.indexOf(btn.dataset.sec)));
@@ -897,31 +1036,124 @@ setInterval(() => {
   navStep(t, dt);
 }, 100);
 
-// ---------- Section Nav : guidage ----------
+// ---------- Section Nav : carte OSM, recherche, guidage ----------
 const navBanner = el("navBanner"), navEta = el("navEta");
-let navDist = 4.2, navStreet = "Rue du Turbo";
+const navQ = el("navQ"), navResults = el("navResults"), kbd = el("kbd");
+let navDist = 0, navStreet = null;      // pas d'itinéraire tant qu'on n'a rien cherché
 
-for (const b of document.querySelectorAll("#sec-nav .dests button")) {
-  b.addEventListener("click", () => {
-    document.querySelector("#sec-nav .dests button.on")?.classList.remove("on");
-    b.classList.add("on");
-    navDist = Number(b.dataset.dist);
-    navStreet = b.dataset.street;
-  });
+// Position "GPS" de la voiture : centre de la carte chargée.
+// Défaut : haut des Champs-Élysées (pas PILE sur l'Arc de Triomphe,
+// sinon la voiture spawne dedans). Surchargable via ?lat=..&lon=..
+const P = new URLSearchParams(location.search);
+const carPos = {
+  lat: Number(P.get("lat")) || 48.8721,
+  lon: Number(P.get("lon")) || 2.2988,
+};
+
+(async () => {
+  try {
+    const n = await window.__kittMap.load(carPos.lat, carPos.lon, 700);
+    navBanner.textContent = "Où va-t-on ?";
+    console.log(`[nav] ville chargée : ${n} éléments OSM`);
+  } catch (e) {
+    navBanner.textContent = "carte indisponible (" + e.message + ")";
+  }
+})();
+
+// --- Clavier tactile AZERTY ---
+const KBD_ROWS = ["azertyuiop", "qsdfghjklm", "wxcvbn'-"];
+for (const row of KBD_ROWS) {
+  const div = document.createElement("div");
+  div.className = "row";
+  for (const ch of row) {
+    const b = document.createElement("button");
+    b.textContent = ch;
+    b.addEventListener("click", () => keyPress(ch));
+    div.appendChild(b);
+  }
+  kbd.appendChild(div);
+}
+{
+  const div = document.createElement("div");
+  div.className = "row";
+  const mk = (label, cls, fn) => {
+    const b = document.createElement("button");
+    b.textContent = label; b.className = cls;
+    b.addEventListener("click", fn);
+    div.appendChild(b);
+  };
+  mk("⌫", "wide", () => keyPress(null));
+  mk("espace", "space", () => keyPress(" "));
+  mk("OK", "wide go", () => { hideKbd(); geocode(navQ.value, true); });
+  kbd.appendChild(div);
+}
+
+function keyPress(ch) {
+  navQ.value = ch === null ? navQ.value.slice(0, -1) : navQ.value + ch;
+  scheduleGeocode();
+}
+function showKbd() { kbd.hidden = false; navQ.classList.add("on"); navEta.style.opacity = 0; }
+function hideKbd() { kbd.hidden = true; navQ.classList.remove("on"); navEta.style.opacity = 1; }
+navQ.addEventListener("click", showKbd);
+
+// --- Recherche (Nominatim via le proxy /geocode) ---
+let geoTimer = null;
+function scheduleGeocode() {
+  clearTimeout(geoTimer);
+  if (navQ.value.trim().length < 3) { navResults.innerHTML = ""; return; }
+  geoTimer = setTimeout(() => geocode(navQ.value), 700);
+}
+async function geocode(q, pickFirst = false) {
+  q = q.trim();
+  if (q.length < 3) return;
+  try {
+    const res = await (await fetch("/geocode?" + new URLSearchParams({ q }))).json();
+    if (res.error) throw new Error(res.error);
+    navResults.innerHTML = "";
+    if (pickFirst && res.length) return setDestination(res[0]);
+    for (const hit of res) {
+      const b = document.createElement("button");
+      const parts = hit.display_name.split(",");
+      b.innerHTML = `${parts[0]}<small>${parts.slice(1, 4).join(",").trim()}</small>`;
+      b.addEventListener("click", () => setDestination(hit));
+      navResults.appendChild(b);
+    }
+  } catch (e) {
+    navResults.innerHTML = `<button disabled>recherche indisponible — ${e.message}</button>`;
+  }
+}
+
+// --- Itinéraire (OSRM via le proxy /route) ---
+async function setDestination(hit) {
+  hideKbd();
+  navResults.innerHTML = "";
+  navQ.value = hit.display_name.split(",")[0];
+  navBanner.textContent = "calcul de l'itinéraire…";
+  try {
+    const res = await (await fetch("/route?" + new URLSearchParams({
+      flat: carPos.lat, flon: carPos.lon, tlat: hit.lat, tlon: hit.lon }))).json();
+    const route = res.routes?.[0];
+    if (!route) throw new Error(res.error || res.code || "pas de route");
+    window.__kittMap.setRoute(route.geometry.coordinates);
+    navDist = route.distance / 1000;
+    navStreet = navQ.value;
+  } catch (e) {
+    navBanner.textContent = "itinéraire indisponible (" + e.message + ")";
+    navStreet = null;
+  }
 }
 
 function navStep(t, dt) {
-  navDist = Math.max(0, navDist - (t.speed * dt) / 3600);
-  if (SECTIONS[secIdx] !== "nav") return;
+  if (navStreet) navDist = Math.max(0, navDist - (t.speed * dt) / 3600);
+  if (SECTIONS[secIdx] !== "nav" || !navStreet) return;
   const arrived = navDist <= 0.005;
-  const turnIn = Math.max(0, Math.round(Math.min(navDist * 1000, 400) / 10) * 10);
   navBanner.textContent = arrived
     ? "🏁 Vous êtes arrivé"
-    : `↱ ${turnIn} m — ${navStreet}`;
+    : `➤ ${navStreet}`;
   const etaMin = t.speed > 3 ? (navDist / t.speed) * 60 : navDist * 1.2;
   navEta.innerHTML = arrived
     ? "Destination atteinte"
-    : `<b>${navDist.toFixed(1)} km</b> &nbsp;·&nbsp; ${Math.max(1, Math.round(etaMin))} min &nbsp;·&nbsp; arrivée ${
+    : `<b>${navDist < 10 ? navDist.toFixed(1) : Math.round(navDist)} km</b> &nbsp;·&nbsp; ${Math.max(1, Math.round(etaMin))} min &nbsp;·&nbsp; arrivée ${
         new Date(Date.now() + etaMin * 60000).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`;
 }
 
