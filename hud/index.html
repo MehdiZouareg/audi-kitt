@@ -593,11 +593,14 @@ controls.maxPolarAngle = 1.45;         // …jusqu'au quasi-profil
 
 // Un doigt sur l'écran stoppe la rotation ; elle reprend 3 s après.
 let resumeTimer = null;
+let manualUntil = 0;                   // la caméra automatique se tait jusque-là
 controls.addEventListener("start", () => {
   controls.autoRotate = false;
+  manualUntil = Infinity;
   clearTimeout(resumeTimer);
 });
 controls.addEventListener("end", () => {
+  manualUntil = performance.now() + 3000;
   clearTimeout(resumeTimer);
   resumeTimer = setTimeout(() => { controls.autoRotate = true; }, 3000);
 });
@@ -650,9 +653,46 @@ function stepFlight(dt) {
   camera.zoom += dZoom * k;
   camera.updateProjectionMatrix();
   if (Math.abs(dTheta) < 0.01 && Math.abs(dPhi) < 0.01 && Math.abs(dZoom) < 0.01) {
-    if (flight.rotate) controls.autoRotate = true;   // l'iso par défaut re-tourne
+    // L'iso par défaut re-tourne… sauf si la voiture roule (caméra de poursuite).
+    if (flight.rotate && driveLevel < 0.06) controls.autoRotate = true;
     flight = null;
   }
+}
+
+// Caméra de poursuite : plus ça va vite, plus la caméra descend derrière
+// la voiture et se rapproche. À l'arrêt, elle remonte en iso et l'orbite
+// automatique reprend. Le toucher reste prioritaire.
+// L'axe de marche pointe vers la caméra en vue arrière stricte : les
+// traînées s'y écraseraient (projection orthographique). On décale donc
+// la poursuite en 3/4 arrière — plus lisible, et plus cinématographique.
+const CHASE = { dTheta: 0.55, phi: 1.36, zoom: 1.5 };
+function stepChase(dt) {
+  if (!driveMode || flight || performance.now() < manualUntil) return;
+  const base = VIEWS.car;
+  const v = driveLevel;
+  const driving = v >= 0.06;
+  // À l'arrêt on vise la vue iso de base ; l'orbite ne reprend qu'une fois
+  // revenu (sinon elle se battrait avec le recentrage).
+  if (controls.autoRotate) {
+    if (driving) controls.autoRotate = false;
+    else return;                               // déjà rentré : rien à faire
+  }
+  const ease = v * v * (3 - 2 * v);            // smoothstep : départ tout en douceur
+  const tgtPhi  = base.phi  + (CHASE.phi  - base.phi)  * ease;
+  const tgtZoom = base.zoom + (CHASE.zoom - base.zoom) * ease;
+  _sph.setFromVector3(camera.position);
+  const k = 1 - Math.exp(-2.2 * dt);
+  // On ne recale l'azimut que si on roule : à l'arrêt, la voiture reste
+  // là où l'utilisateur (ou l'orbite) l'avait laissée.
+  if (driving) _sph.theta += wrapAngle(base.theta + CHASE.dTheta * ease - _sph.theta) * k;
+  _sph.phi += (tgtPhi - _sph.phi) * k;
+  _sph.radius = 10;
+  camera.position.setFromSpherical(_sph);
+  camera.lookAt(0, 0, 0);
+  camera.zoom += (tgtZoom - camera.zoom) * k;
+  camera.updateProjectionMatrix();
+  if (!driving && Math.abs(_sph.phi - base.phi) < 0.02 && Math.abs(camera.zoom - base.zoom) < 0.02)
+    controls.autoRotate = true;                // rentré : l'orbite reprend
 }
 
 // ---------- Sol ----------
@@ -690,6 +730,93 @@ if (SYNTH) {
     new THREE.BufferGeometry().setFromPoints(circlePoints(r)),
     new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: o }));
   scene.add(mk(2.6, 0.18), mk(2.75, 0.07));
+}
+
+// ---------- Sensation de vitesse (section kiTT) ----------
+// Le modèle est figé (pas de roues animées) : le mouvement vient de
+// l'ENVIRONNEMENT. Des traînées néon filent vers l'arrière le long de
+// l'axe de marche, et la caméra plonge derrière la voiture quand ça
+// accélère. Tout est piloté par la vitesse du simulateur (plus tard :
+// le PID 0x0D du vrai OBD).
+//
+// Le modèle regarde vers (-1, 0, -1) : on tourne le rig de 45° pour
+// travailler dans un repère où +Z local = vers l'arrière de la voiture.
+const speedRig = new THREE.Group();
+speedRig.rotation.y = Math.PI / 4;
+speedRig.visible = false;
+scene.add(speedRig);
+
+const N_STREAK = 150;
+const streakData = [];               // {x, y, z, len}
+const streakPos = new Float32Array(N_STREAK * 6);
+for (let i = 0; i < N_STREAK; i++) {
+  const side = Math.random() < 0.5 ? -1 : 1;
+  streakData.push({
+    // Écartées de la voiture (qui fait ~4 unités) : elles filent SUR LES CÔTÉS
+    // au lieu de barrer la carrosserie.
+    x: side * (3.6 + Math.random() * 8),
+    y: 0.05 + Math.random() * Math.random() * 2.8,   // densité près du sol
+    z: -40 + Math.random() * 55,
+    len: 1.2 + Math.random() * 2.2,
+  });
+}
+const streakGeo = new THREE.BufferGeometry();
+streakGeo.setAttribute("position", new THREE.BufferAttribute(streakPos, 3));
+const streakMat = new THREE.LineBasicMaterial({
+  color: NEON_CYAN, transparent: true, opacity: 0, blending: THREE.AdditiveBlending,
+});
+speedRig.add(new THREE.LineSegments(streakGeo, streakMat));
+
+// Marquages au sol : des tirets qui défilent de part et d'autre.
+const N_DASH = 44;
+const dashData = [];
+const dashPos = new Float32Array(N_DASH * 6);
+for (let i = 0; i < N_DASH; i++)
+  dashData.push({ x: (i % 2 ? -1 : 1) * 2.9, z: -44 + (i >> 1) * 4.2, len: 2.0 });
+const dashGeo = new THREE.BufferGeometry();
+dashGeo.setAttribute("position", new THREE.BufferAttribute(dashPos, 3));
+const dashMat = new THREE.LineBasicMaterial({
+  color: NEON_PINK, transparent: true, opacity: 0, blending: THREE.AdditiveBlending,
+});
+speedRig.add(new THREE.LineSegments(dashGeo, dashMat));
+
+let driveRaw = 0;                    // 0..1 : vitesse normalisée (0-140 km/h)
+let driveLevel = 0;                  // version lissée
+let driveMode = false;               // vrai seulement en section kiTT
+window.__kittSpeed = (kmh) => { driveRaw = Math.min(1, kmh / 140); };
+window.__kittDriveMode = (on) => {
+  driveMode = on;
+  speedRig.visible = on;
+  if (!on) { streakMat.opacity = 0; dashMat.opacity = 0; }
+};
+
+function stepSpeed(dt) {
+  driveLevel += (driveRaw - driveLevel) * (1 - Math.exp(-2.2 * dt));
+  if (!driveMode) return;
+
+  // Les traînées filent vers l'arrière ; longueur et éclat suivent la vitesse.
+  const v = driveLevel;
+  const travel = (6 + v * 78) * dt;
+  for (let i = 0; i < N_STREAK; i++) {
+    const s = streakData[i];
+    s.z += travel;
+    if (s.z > 16) { s.z -= 58; s.x = (Math.random() < 0.5 ? -1 : 1) * (3.6 + Math.random() * 8); }
+    const len = s.len * (0.2 + v * 0.9);       // s'étirent avec la vitesse
+    streakPos[i * 6 + 0] = s.x; streakPos[i * 6 + 1] = s.y; streakPos[i * 6 + 2] = s.z - len;
+    streakPos[i * 6 + 3] = s.x; streakPos[i * 6 + 4] = s.y; streakPos[i * 6 + 5] = s.z;
+  }
+  streakGeo.attributes.position.needsUpdate = true;
+  streakMat.opacity = Math.min(0.5, v * 0.62);
+
+  for (let i = 0; i < N_DASH; i++) {
+    const d = dashData[i];
+    d.z += travel;
+    if (d.z > 16) d.z -= 92;
+    dashPos[i * 6 + 0] = d.x; dashPos[i * 6 + 1] = 0.015; dashPos[i * 6 + 2] = d.z - d.len;
+    dashPos[i * 6 + 3] = d.x; dashPos[i * 6 + 4] = 0.015; dashPos[i * 6 + 5] = d.z;
+  }
+  dashGeo.attributes.position.needsUpdate = true;
+  dashMat.opacity = Math.min(0.5, v * 0.75);
 }
 
 // ---------- Ville OSM : la scène devient la carte en section Nav ----------
@@ -953,6 +1080,8 @@ renderer.setAnimationLoop(() => {
   const dt = Math.min(0.1, (now - prevT) / 1000);
   prevT = now;
   stepFlight(dt);
+  stepSpeed(dt);
+  stepChase(dt);
   stepRoute(dt);
   controls.update();
   if (composer) composer.render();
@@ -1020,9 +1149,11 @@ function setSection(idx) {
   document.querySelectorAll("#pager i").forEach((p, i) => p.classList.toggle("on", i === secIdx));
   window.__kittFly?.(name);
   window.__kittMap?.show(name === "nav");
+  window.__kittDriveMode?.(name === "car");
 }
 for (const btn of document.querySelectorAll("#dock button"))
   btn.addEventListener("click", () => setSection(SECTIONS.indexOf(btn.dataset.sec)));
+window.__kittDriveMode?.(true);        // on démarre sur la section kiTT
 
 // Molette : section suivante/précédente (avec garde anti-rafale).
 let wheelLock = 0;
@@ -1145,6 +1276,7 @@ setInterval(() => {
 
   speedHistory.push(t.speed);
   if (speedHistory.length > 600) speedHistory.shift();
+  window.__kittSpeed?.(t.speed);        // pilote traînées + caméra de poursuite
 
   // Section kiTT (dashboard).
   carSpeed.textContent = t.speed;
