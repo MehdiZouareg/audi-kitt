@@ -87,10 +87,19 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
             if url.path == "/geocode":
                 text = q["q"][0]
-                key = "geo_" + hashlib.sha1(text.lower().encode()).hexdigest()[:16]
+                args = {"q": text, "format": "json", "limit": 5}
+                # Biais de proximité : sans lui, "tour eiffel" peut renvoyer un
+                # homonyme à l'autre bout du pays. viewbox = ~±0.35° (~35 km)
+                # autour de la voiture, non borné (les résultats lointains
+                # restent possibles, mais après les locaux).
+                if "lat" in q and "lon" in q:
+                    lat, lon = float(q["lat"][0]), float(q["lon"][0])
+                    d = 0.35
+                    args["viewbox"] = f"{lon - d},{lat + d},{lon + d},{lat - d}"
+                key = "geo_" + hashlib.sha1(
+                    (text.lower() + args.get("viewbox", "")).encode()).hexdigest()[:16]
                 body = fetch_json(
-                    "https://nominatim.openstreetmap.org/search?"
-                    + urllib.parse.urlencode({"q": text, "format": "json", "limit": 5}),
+                    "https://nominatim.openstreetmap.org/search?" + urllib.parse.urlencode(args),
                     cache_key=key,
                 )
                 return self._json(body)

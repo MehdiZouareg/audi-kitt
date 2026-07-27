@@ -177,9 +177,10 @@
   #navResults button:active { color: #fff; background: rgba(36,229,255,.15); }
   #navResults button small { display: block; font-size: 11px; color: rgba(255,233,251,.45); }
 
-  /* Clavier tactile : grosses touches, bas d'écran */
+  /* Clavier tactile partagé : grosses touches, bas d'écran */
   #kbd {
-    position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%);
+    position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%);
+    z-index: 60;
     display: flex; flex-direction: column; gap: 7px;
     padding: 12px;
     background: rgba(10,2,24,.72);
@@ -298,6 +299,62 @@
   .toast.info small { color: rgba(220,247,255,.5); }
   .toast.out { opacity: 0; transform: translateX(14px); }
   @keyframes toastIn { from { opacity: 0; transform: translateX(14px); } }
+
+  /* ---------- Assistant kiTT (swipe vers le haut) ---------- */
+  #assist {
+    position: fixed; inset: 0; z-index: 30;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: flex-end;
+    padding-bottom: 26px; gap: 14px;
+    background: linear-gradient(to top,
+      rgba(5,1,15,.94) 0%, rgba(5,1,15,.6) 40%, transparent 72%);
+    opacity: 0; transform: translateY(36px);
+    transition: opacity .4s ease, transform .4s ease;
+    pointer-events: none;
+  }
+  #assist.on { opacity: 1; transform: none; }
+  /* Clavier ouvert : on remonte le contenu au-dessus des touches. */
+  #assist.kbd { padding-bottom: 300px; }
+  #assist.kbd #orb { width: 74px; height: 74px; }
+  #assist.on input, #assist.on button { pointer-events: auto; }
+  #assistUser {
+    font-size: 14px; color: rgba(255,233,251,.55);
+    letter-spacing: .05em; min-height: 18px;
+  }
+  #assistReply {
+    font-size: 26px; font-weight: 200; text-align: center;
+    max-width: min(70%, 640px); line-height: 1.35;
+    text-shadow: 0 0 12px rgba(36,229,255,.5);
+    min-height: 36px;
+  }
+  #orb { width: 108px; height: 108px; }
+  #assistRow { display: flex; gap: 10px; align-items: center; width: min(46%, 400px); }
+  #assistQ {
+    flex: 1; box-sizing: border-box;
+    background: rgba(16,4,34,.65);
+    border: 1px solid rgba(36,229,255,.4);
+    border-radius: 12px;
+    color: #fff; font: inherit; font-size: 16px;
+    padding: 12px 16px; outline: none;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  #assistMic {
+    width: 46px; height: 46px; border-radius: 50%;
+    background: rgba(16,4,34,.65);
+    border: 1px solid rgba(255,45,149,.4);
+    color: #ffe9fb; font-size: 18px; cursor: pointer;
+  }
+  #assistMic.rec {
+    border-color: #ff3b3b;
+    box-shadow: 0 0 14px rgba(255,59,59,.5);
+    animation: micPulse 1.1s ease-in-out infinite;
+  }
+  @keyframes micPulse { 50% { box-shadow: 0 0 26px rgba(255,59,59,.8); } }
+  #assistHint {
+    font-size: 10px; letter-spacing: .25em; text-transform: uppercase;
+    color: rgba(255,233,251,.3);
+  }
 </style>
 </head>
 <body>
@@ -344,9 +401,23 @@
     <input id="navQ" type="text" placeholder="🔍 Rechercher une adresse…" readonly>
     <div id="navResults"></div>
   </div>
-  <div id="kbd" class="touch" hidden><!-- rempli par le script --></div>
   <div class="eta" id="navEta">—</div>
 </section>
+
+<!-- Clavier tactile partagé (recherche Nav, assistant kiTT) -->
+<div id="kbd" hidden><!-- rempli par le script --></div>
+
+<!-- ===== Assistant kiTT : swipe vers le haut ===== -->
+<div id="assist">
+  <div id="assistUser"></div>
+  <div id="assistReply">Comment puis-je aider ?</div>
+  <canvas id="orb" width="150" height="150"></canvas>
+  <div id="assistRow">
+    <input id="assistQ" type="text" placeholder="Parle à kiTT…" readonly>
+    <button id="assistMic" title="reconnaissance vocale">🎤</button>
+  </div>
+  <div id="assistHint">balaye vers le bas pour fermer</div>
+</div>
 
 <!-- ===== Section Audio ===== -->
 <section class="sec" id="sec-audio">
@@ -542,6 +613,8 @@ const VIEWS = {
   nav:   { theta: 0.0,                   phi: 0.3,  zoom: 0.16, car: 0.34, rotate: false },
   audio: { theta: 0.06,                  phi: 1.32, zoom: 1.22, car: 1.0,  rotate: false },
   obd:   { theta: Math.PI / 4 + Math.PI, phi: 1.22, zoom: 1.12, car: 1.0,  rotate: false },
+  // Face à face avec la voiture : la vue de l'assistant vocal.
+  assistant: { theta: Math.PI / 4 + Math.PI, phi: 1.28, zoom: 1.45, car: 1.0, rotate: false },
 };
 let flight = null;
 let carFactorTarget = 1.0;
@@ -765,6 +838,7 @@ const rimMat = new THREE.ShaderMaterial({
     uCyan:   { value: NEON_CYAN },
     uMinY:   { value: 0.0 },
     uMaxY:   { value: 1.0 },
+    uPulse:  { value: 0.0 },   // 0..1 : la carrosserie "parle" (assistant kiTT)
   },
   vertexShader: /* glsl */`
     varying vec3 vNormal;
@@ -784,9 +858,12 @@ const rimMat = new THREE.ShaderMaterial({
     uniform float uMaxY;
     varying vec3 vNormal;
     varying float vY;
+    uniform float uPulse;
     void main() {
       float f = 1.0 - abs(normalize(vNormal).z);
-      float line = smoothstep(uCut, uCut + uSoft, f);
+      // La pulsation abaisse le seuil : le trait s'élargit quand kiTT parle.
+      float cut = uCut - uPulse * 0.28;
+      float line = smoothstep(cut, cut + uSoft, f);
       float h = clamp((vY - uMinY) / (uMaxY - uMinY), 0.0, 1.0);
       vec3 white = vec3(1.0);
       vec3 neon  = mix(uPink, uCyan, h);
@@ -797,6 +874,7 @@ const rimMat = new THREE.ShaderMaterial({
   blending: THREE.AdditiveBlending,
   depthWrite: false,
 });
+window.__kittPulse = (v) => { rimMat.uniforms.uPulse.value = Math.max(0, Math.min(1, v)); };
 
 function loadCar(chain) {
   chain = chain.filter(Boolean);
@@ -858,7 +936,7 @@ function loadCar(chain) {
       rimMat.uniforms.uMinY.value = scaled.min.y;
       rimMat.uniforms.uMaxY.value = scaled.max.y;
 
-      statusEl.textContent = "scroll / swipe : sections · toucher : orienter";
+      statusEl.textContent = "swipe ←→ : sections · swipe ↑ : kiTT · toucher : orienter";
       setTimeout(() => (statusEl.style.opacity = 0), 6000);
       window.__kitt = { scene, camera, controls, carGroup, renderer, composer, stepFlight };
     },
@@ -955,13 +1033,17 @@ addEventListener("wheel", (e) => {
   setSection(secIdx + (e.deltaY > 0 ? 1 : -1));
 }, { passive: true });
 
-// Flèches clavier (pratique sur desktop).
+// Flèches clavier (pratique sur desktop) : ←/→ sections, ↑/↓ assistant.
 addEventListener("keydown", (e) => {
-  if (e.key === "ArrowRight" || e.key === "ArrowDown") setSection(secIdx + 1);
-  if (e.key === "ArrowLeft"  || e.key === "ArrowUp")   setSection(secIdx - 1);
+  if (window.__kittAssistOpen?.() && e.key !== "ArrowDown" && e.key !== "Escape") return;
+  if (e.key === "ArrowRight") setSection(secIdx + 1);
+  if (e.key === "ArrowLeft")  setSection(secIdx - 1);
+  if (e.key === "ArrowUp")    window.__kittOpenAssist?.();
+  if (e.key === "ArrowDown")  window.__kittCloseAssist?.();
 });
 
-// Swipe horizontal rapide : changer de section ; glisser lent : orbiter.
+// Gestes : swipe horizontal = section, swipe vertical = assistant kiTT.
+// (glisser lent = orbiter la voiture, géré par OrbitControls)
 let touchStart = null;
 addEventListener("pointerdown", (e) => { touchStart = { x: e.clientX, y: e.clientY, t: performance.now() }; });
 addEventListener("pointerup", (e) => {
@@ -969,8 +1051,19 @@ addEventListener("pointerup", (e) => {
   const dx = e.clientX - touchStart.x, dy = e.clientY - touchStart.y;
   const dt = performance.now() - touchStart.t;
   touchStart = null;
-  if (dt < 350 && Math.abs(dx) > 80 && Math.abs(dx) > 2.5 * Math.abs(dy))
+  if (dt > 350) return;                          // trop lent : c'était une orbite
+  if (Math.abs(dy) > 90 && Math.abs(dy) > 2.5 * Math.abs(dx)) {
+    if (dy < 0) window.__kittOpenAssist?.();     // vers le haut : kiTT monte
+    else        window.__kittCloseAssist?.();    // vers le bas : il redescend
+    return;
+  }
+  if (Math.abs(dx) > 80 && Math.abs(dx) > 2.5 * Math.abs(dy) && !window.__kittAssistOpen?.())
     setSection(secIdx + (dx < 0 ? 1 : -1));
+});
+
+// Clavier : flèche haut/bas = assistant (pratique au bureau), Échap = fermer.
+addEventListener("keydown", (e) => {
+  if (e.key === "Escape") window.__kittCloseAssist?.();
 });
 
 // ---------- Télémétrie : simulateur de conduite ----------
@@ -1136,7 +1229,9 @@ document.querySelector("#sec-nav .banner").classList.add("touch");
 navBanner.addEventListener("click", () => { if (!cityLoaded) loadCity(); });
 loadCity();
 
-// --- Clavier tactile AZERTY ---
+// --- Clavier tactile AZERTY, partagé entre la recherche Nav et l'assistant ---
+// kbdTarget = { input, onType, onEnter } ; null = clavier fermé.
+let kbdTarget = null;
 const KBD_ROWS = ["azertyuiop", "qsdfghjklm", "wxcvbn'-"];
 for (const row of KBD_ROWS) {
   const div = document.createElement("div");
@@ -1160,17 +1255,40 @@ for (const row of KBD_ROWS) {
   };
   mk("⌫", "wide", () => keyPress(null));
   mk("espace", "space", () => keyPress(" "));
-  mk("OK", "wide go", () => { hideKbd(); geocode(navQ.value, true); });
+  mk("OK", "wide go", () => {
+    const t = kbdTarget;
+    hideKbd();
+    t?.onEnter?.(t.input.value);
+  });
   kbd.appendChild(div);
 }
 
 function keyPress(ch) {
-  navQ.value = ch === null ? navQ.value.slice(0, -1) : navQ.value + ch;
-  scheduleGeocode();
+  if (!kbdTarget) return;
+  const inp = kbdTarget.input;
+  inp.value = ch === null ? inp.value.slice(0, -1) : inp.value + ch;
+  kbdTarget.onType?.(inp.value);
 }
-function showKbd() { kbd.hidden = false; navQ.classList.add("on"); navEta.style.opacity = 0; }
-function hideKbd() { kbd.hidden = true; navQ.classList.remove("on"); navEta.style.opacity = 1; }
-navQ.addEventListener("click", showKbd);
+function showKbd(target) {
+  kbdTarget = target;
+  kbd.hidden = false;
+  target.input.classList.add("on");
+  // L'assistant remonte son contenu pour ne pas passer sous les touches.
+  document.getElementById("assist").classList.toggle("kbd", target.input.id === "assistQ");
+}
+function hideKbd() {
+  kbdTarget?.input.classList.remove("on");
+  kbdTarget = null;
+  kbd.hidden = true;
+  navEta.style.opacity = 1;
+  document.getElementById("assist").classList.remove("kbd");
+}
+window.__kittHideKbd = hideKbd;
+
+navQ.addEventListener("click", () => {
+  navEta.style.opacity = 0;
+  showKbd({ input: navQ, onType: scheduleGeocode, onEnter: (v) => geocode(v, true) });
+});
 
 // --- Recherche (Nominatim via le proxy /geocode) ---
 let geoTimer = null;
@@ -1179,14 +1297,20 @@ function scheduleGeocode() {
   if (navQ.value.trim().length < 3) { navResults.innerHTML = ""; return; }
   geoTimer = setTimeout(() => geocode(navQ.value), 700);
 }
+window.__kittGeocode = (q) => geocode(q, true);   // l'assistant route "va à X"
 async function geocode(q, pickFirst = false) {
   q = q.trim();
   if (q.length < 3) return;
   try {
-    const res = await (await fetch("/geocode?" + new URLSearchParams({ q }))).json();
+    // lat/lon : biais de proximité côté Nominatim (résultats près de la voiture).
+    const res = await (await fetch("/geocode?" + new URLSearchParams({
+      q, lat: carPos.lat, lon: carPos.lon }))).json();
     if (res.error) throw new Error(res.error);
     navResults.innerHTML = "";
-    if (pickFirst && res.length) return setDestination(res[0]);
+    if (pickFirst) {
+      if (!res.length) return null;
+      return await setDestination(res[0]);
+    }
     for (const hit of res) {
       const b = document.createElement("button");
       const parts = hit.display_name.split(",");
@@ -1202,7 +1326,7 @@ async function geocode(q, pickFirst = false) {
 
 // --- Itinéraire (OSRM via le proxy /route) ---
 async function setDestination(hit) {
-  hideKbd();
+  if (kbdTarget?.input === navQ) hideKbd();
   navResults.innerHTML = "";
   navQ.value = hit.display_name.split(",")[0];
   navBanner.textContent = "calcul de l'itinéraire…";
@@ -1214,6 +1338,7 @@ async function setDestination(hit) {
     window.__kittMap.setRoute(route.geometry.coordinates);
     navDist = route.distance / 1000;
     navStreet = navQ.value;
+    return { km: navDist, min: Math.round(route.duration / 60), name: navStreet };
   } catch (e) {
     kittToast("Itinéraire indisponible", e.message);
     navBanner.textContent = "Où va-t-on ?";
@@ -1282,6 +1407,229 @@ setInterval(() => {
   tCur.textContent = fmt(tPos);
 }, 250);
 loadTrack(0);
+
+// ============================================================
+//  Assistant kiTT — swipe vers le haut
+// ============================================================
+//  Reprend la logique déjà écrite côté MPU :
+//    - voice.py    : machine à états VEILLE -> ECOUTE -> REFLEXION -> PAROLE
+//    - intents.py  : reconnaissance par mots-clés, insensible aux accents
+//  Ici c'est la COUCHE HUD : l'orbe reprend les états (comme la matrice LED
+//  13x8 le fait dans la voiture) et la carrosserie PULSE quand kiTT parle.
+//  Le micro utilise la Web Speech API si dispo ; sinon le clavier tactile.
+
+const assist = el("assist"), assistQ = el("assistQ"), assistMic = el("assistMic");
+const assistReply = el("assistReply"), assistUser = el("assistUser");
+const orb = el("orb"), orbCtx = orb.getContext("2d");
+let assistOpen = false;
+let vState = "idle";                    // idle | listen | think | speak
+let vLevel = 0;                         // 0..1 : amplitude (micro ou TTS)
+let speakUntil = 0;
+
+function openAssist() {
+  if (assistOpen) return;
+  assistOpen = true;
+  assist.classList.add("on");
+  window.__kittFly?.("assistant");
+  setVState("idle");
+}
+function closeAssist() {
+  if (!assistOpen) return;
+  assistOpen = false;
+  assist.classList.remove("on");
+  if (kbdTarget?.input === assistQ) window.__kittHideKbd();
+  stopRec();
+  setVState("idle");
+  window.__kittFly?.(SECTIONS[secIdx]);   // retour à la vue de la section courante
+}
+window.__kittAssistOpen = () => assistOpen;
+window.__kittCloseAssist = closeAssist;
+window.__kittOpenAssist = openAssist;
+
+function setVState(s) {
+  vState = s;
+  if (s !== "speak") window.__kittPulse?.(0);
+}
+
+// --- Orbe : le "visage" de kiTT, un anneau qui réagit à l'état ---
+// (même vocabulaire que les animations de la matrice LED : veille douce,
+//  écoute qui suit le niveau, réflexion qui tourne, parole qui pulse)
+function drawOrb(t) {
+  const w = orb.width, h = orb.height, cx = w / 2, cy = h / 2;
+  orbCtx.clearRect(0, 0, w, h);
+  const base = 34;
+  const amp = vState === "listen" ? vLevel * 16
+            : vState === "speak"  ? vLevel * 20 : 0;
+
+  // Anneau principal, déformé par l'amplitude.
+  orbCtx.lineWidth = 2.5;
+  orbCtx.strokeStyle = vState === "speak" ? "#ff2d95" : "#24e5ff";
+  orbCtx.shadowColor = orbCtx.strokeStyle;
+  orbCtx.shadowBlur = 14 + amp;
+  orbCtx.beginPath();
+  for (let i = 0; i <= 72; i++) {
+    const a = (i / 72) * Math.PI * 2;
+    const wobble = vState === "idle" ? Math.sin(a * 3 + t * 1.2) * 1.6
+                                     : Math.sin(a * 5 + t * 7) * amp * 0.5;
+    const r = base + amp * 0.5 + wobble;
+    const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+    i ? orbCtx.lineTo(x, y) : orbCtx.moveTo(x, y);
+  }
+  orbCtx.closePath();
+  orbCtx.stroke();
+
+  // Arc de réflexion qui tourne.
+  if (vState === "think") {
+    orbCtx.beginPath();
+    orbCtx.arc(cx, cy, base + 12, t * 3, t * 3 + 1.1);
+    orbCtx.stroke();
+  }
+  orbCtx.shadowBlur = 0;
+}
+
+// --- Reconnaissance d'intentions (portage de python/intents.py) ---
+const strip = (s) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+const has = (s, ...words) => words.some(w => s.includes(w));
+
+async function route(text) {
+  const s = strip(text);
+
+  // Navigation : "va à X", "emmène-moi à X", "itinéraire vers X"
+  const m = s.match(/(?:va (?:a|au|vers)|emmene[- ]moi (?:a|au|vers)|itineraire (?:vers|pour)|direction|conduis[- ]moi (?:a|au|vers))\s+(.{2,})/);
+  if (m) {
+    const dest = m[1].trim();
+    setSection(SECTIONS.indexOf("nav"));
+    const r = await window.__kittGeocode(dest);
+    return r
+      ? `C'est parti pour ${r.name} — ${r.km < 10 ? r.km.toFixed(1) : Math.round(r.km)} kilomètres, environ ${r.min} minutes.`
+      : `Je ne trouve pas « ${dest} ».`;
+  }
+
+  // Télémétrie : l'assistant lit le simulateur (plus tard : le vrai OBD)
+  const t = sim.snapshot();
+  if (has(s, "vitesse", "vite", "roule"))
+    return `Tu roules à ${t.speed} kilomètres-heure.`;
+  if (has(s, "regime", "tour", "rpm"))
+    return `Le moteur tourne à ${t.rpm.toLocaleString("fr-FR")} tours par minute.`;
+  if (has(s, "temperature", "chauffe", "eau", "moteur"))
+    return `La température moteur est de ${t.coolant_temp} degrés.` +
+           (t.coolant_temp > 105 ? " Attention, c'est trop chaud." : " Tout va bien.");
+  if (has(s, "essence", "carburant", "reservoir", "autonomie"))
+    return `Il reste ${t.fuel} pour cent de carburant, soit environ ${Math.round(t.fuel * 0.55 * 12)} kilomètres.`;
+  if (has(s, "batterie", "tension", "volt"))
+    return `La batterie est à ${t.volt.toFixed(1)} volts.`;
+  if (has(s, "turbo", "pression", "boost"))
+    return `Pression turbo : ${t.boost > 0 ? "+" : ""}${t.boost.toFixed(2)} bar.`;
+  if (has(s, "diagnostic", "obd", "etat de la voiture", "bilan")) {
+    setSection(SECTIONS.indexOf("obd"));
+    return `Diagnostic : ${t.speed} kilomètres-heure, ${t.rpm} tours, ${t.coolant_temp} degrés, ${t.fuel} pour cent de carburant.`;
+  }
+
+  // Écrans
+  if (has(s, "navigation", "carte", "gps")) { setSection(SECTIONS.indexOf("nav")); return "Voici la carte."; }
+  if (has(s, "musique", "audio", "morceau", "chanson")) {
+    setSection(SECTIONS.indexOf("audio"));
+    return `On écoute ${TRACKS[trackIdx].t}, de ${TRACKS[trackIdx].a}.`;
+  }
+  if (has(s, "tableau de bord", "accueil", "veille")) { setSection(0); return "Retour au tableau de bord."; }
+
+  // Média
+  if (has(s, "joue", "lance la musique", "play")) { playing = true; syncPlayUI(); return "Je lance la musique."; }
+  if (has(s, "pause", "stop", "arrete", "silence")) { playing = false; syncPlayUI(); return "Musique en pause."; }
+  if (has(s, "suivant", "prochaine", "next")) { loadTrack(trackIdx + 1); playing = true; syncPlayUI(); return `Titre suivant : ${TRACKS[trackIdx].t}.`; }
+  if (has(s, "precedent", "avant", "previous")) { loadTrack(trackIdx - 1); playing = true; syncPlayUI(); return `Titre précédent : ${TRACKS[trackIdx].t}.`; }
+
+  // Divers
+  if (has(s, "heure", "quelle heure"))
+    return `Il est ${new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}.`;
+  if (has(s, "bonjour", "salut", "hello", "coucou"))
+    return "Bonjour. Où allons-nous ?";
+  if (has(s, "merci")) return "Avec plaisir.";
+  if (has(s, "qui es[- ]tu", "qui es tu", "presente"))
+    return "Je suis kiTT, l'intelligence embarquée de ta TT.";
+
+  // Rien de reconnu : côté MPU, c'est ici que le LLM prendrait la main (#6).
+  return "Je n'ai pas compris. Essaie : « va à la tour Eiffel », « quelle est ma vitesse », « joue de la musique ».";
+}
+
+// --- Cycle de conversation : écoute -> réflexion -> parole ---
+async function converse(text) {
+  if (!text.trim()) return;
+  assistUser.textContent = "« " + text + " »";
+  assistReply.textContent = "";
+  setVState("think");
+  const reply = await route(text);
+  assistReply.textContent = reply;
+  speak(reply);
+}
+
+// --- Synthèse vocale (Web Speech API si dispo) ---
+function speak(text) {
+  setVState("speak");
+  // Durée de repli si pas de TTS : ~14 caractères/seconde.
+  speakUntil = performance.now() + Math.max(1600, text.length * 70);
+  const synth = window.speechSynthesis;
+  if (!synth) return;
+  try {
+    synth.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "fr-FR"; u.rate = 1.05; u.pitch = 0.85;
+    u.onend = () => { speakUntil = 0; setVState("idle"); };
+    synth.speak(u);
+  } catch { /* pas de voix installée : on garde le repli temporel */ }
+}
+
+// --- Micro (Web Speech API) ---
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null;
+function startRec() {
+  if (!SR) {
+    kittToast("Micro indisponible", "ce navigateur ne gère pas la reconnaissance vocale — utilise le clavier", "info");
+    return;
+  }
+  rec = new SR();
+  rec.lang = "fr-FR"; rec.interimResults = true; rec.continuous = false;
+  setVState("listen");
+  assistMic.classList.add("rec");
+  rec.onresult = (e) => {
+    const r = e.results[e.results.length - 1];
+    assistQ.value = r[0].transcript;
+    vLevel = 0.35 + Math.random() * 0.5;      // pas d'accès direct au niveau : on l'anime
+    if (r.isFinal) { stopRec(); converse(r[0].transcript); }
+  };
+  rec.onerror = (e) => { stopRec(); kittToast("Micro", e.error); };
+  rec.onend = () => stopRec();
+  try { rec.start(); } catch { stopRec(); }
+}
+function stopRec() {
+  assistMic.classList.remove("rec");
+  if (vState === "listen") setVState("idle");
+  if (rec) { try { rec.stop(); } catch {} rec = null; }
+}
+assistMic.addEventListener("click", () => rec ? stopRec() : startRec());
+assistQ.addEventListener("click", () => showKbd({
+  input: assistQ,
+  onEnter: (v) => { converse(v); assistQ.value = ""; },
+}));
+
+// --- Boucle d'animation de l'orbe + pulsation de la carrosserie ---
+(function orbLoop() {
+  const t = performance.now() / 1000;
+  if (vState === "speak") {
+    // Enveloppe de parole : porteuse + syllabes (comme _envelope() de main.py).
+    const carrier = 0.5 * (1 + Math.sin(t * 6.5));
+    const syll = 0.5 * (1 + Math.sin(t * 17));
+    vLevel = 0.35 + 0.65 * (0.55 * carrier + 0.45 * carrier * syll);
+    window.__kittPulse?.(vLevel * 0.9);
+    if (speakUntil && performance.now() > speakUntil) { speakUntil = 0; setVState("idle"); }
+  } else if (vState === "think") {
+    vLevel = 0.25;
+  } else if (vState !== "listen") {
+    vLevel *= 0.9;
+  }
+  if (assistOpen) drawOrb(t);
+  requestAnimationFrame(orbLoop);
+})();
 </script>
 </body>
 </html>
