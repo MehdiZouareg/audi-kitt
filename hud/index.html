@@ -1197,12 +1197,12 @@ const navQ = el("navQ"), navResults = el("navResults"), kbd = el("kbd");
 let navDist = 0, navStreet = null;      // pas d'itinéraire tant qu'on n'a rien cherché
 
 // Position "GPS" de la voiture : centre de la carte chargée.
-// Défaut : haut des Champs-Élysées (pas PILE sur l'Arc de Triomphe,
-// sinon la voiture spawne dedans). Surchargable via ?lat=..&lon=..
+// Défaut : 150 avenue de la République, La Farlède (Var) — le point de
+// test du projet. Surchargable via ?lat=..&lon=..
 const P = new URLSearchParams(location.search);
 const carPos = {
-  lat: Number(P.get("lat")) || 48.8721,
-  lon: Number(P.get("lon")) || 2.2988,
+  lat: Number(P.get("lat")) || 43.1686,
+  lon: Number(P.get("lon")) || 6.0437,
 };
 
 // Chargement de la ville, avec reprise automatique : les serveurs OSM
