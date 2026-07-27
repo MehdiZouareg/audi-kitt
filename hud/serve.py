@@ -66,12 +66,24 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     f'way["highway"](around:{r},{lat},{lon});'
                     f');out geom;'
                 )
-                body = fetch_json(
+                # Les instances publiques d'Overpass rate-limitent : on tente
+                # chaque miroir avant d'abandonner.
+                mirrors = [
                     "https://overpass-api.de/api/interpreter",
-                    data=urllib.parse.urlencode({"data": ql}).encode(),
-                    cache_key=key,
-                )
-                return self._json(body)
+                    "https://overpass.kumi.systems/api/interpreter",
+                ]
+                last = None
+                for m in mirrors:
+                    try:
+                        body = fetch_json(
+                            m,
+                            data=urllib.parse.urlencode({"data": ql}).encode(),
+                            cache_key=key,
+                        )
+                        return self._json(body)
+                    except Exception as e:
+                        last = e
+                raise last
 
             if url.path == "/geocode":
                 text = q["q"][0]

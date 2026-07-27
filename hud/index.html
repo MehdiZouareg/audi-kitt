@@ -260,6 +260,44 @@
     font-size: 20px; color: #ff6b6b; text-shadow: 0 0 12px rgba(255,59,59,.8);
     letter-spacing: .1em;
   }
+
+  /* ---------- Toasts : erreurs & infos, coin haut droit ---------- */
+  #toasts {
+    position: fixed; top: 52px; right: 16px;
+    display: flex; flex-direction: column; gap: 8px;
+    z-index: 100;
+    pointer-events: none;
+  }
+  .toast {
+    pointer-events: auto;
+    display: flex; gap: 11px; align-items: baseline;
+    max-width: 320px;
+    padding: 11px 15px;
+    border-radius: 12px;
+    background: rgba(28, 4, 20, .78);
+    border: 1px solid rgba(255, 59, 59, .5);
+    box-shadow: 0 0 16px rgba(255, 59, 59, .18), 0 6px 24px rgba(0,0,0,.5);
+    color: #ffdbe4;
+    font-size: 12.5px; line-height: 1.4;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    cursor: pointer;
+    animation: toastIn .3s ease-out;
+    transition: opacity .4s, transform .4s;
+  }
+  .toast .ic { font-size: 15px; text-shadow: 0 0 8px rgba(255,59,59,.9); }
+  .toast b { display: block; font-weight: 600; letter-spacing: .04em; }
+  .toast small { color: rgba(255,219,228,.55); font-size: 11px; }
+  .toast.info {
+    border-color: rgba(36, 229, 255, .45);
+    box-shadow: 0 0 16px rgba(36, 229, 255, .15), 0 6px 24px rgba(0,0,0,.5);
+    background: rgba(6, 16, 30, .78);
+    color: #dcf7ff;
+  }
+  .toast.info .ic { text-shadow: 0 0 8px rgba(36,229,255,.9); }
+  .toast.info small { color: rgba(220,247,255,.5); }
+  .toast.out { opacity: 0; transform: translateX(14px); }
+  @keyframes toastIn { from { opacity: 0; transform: translateX(14px); } }
 </style>
 </head>
 <body>
@@ -267,6 +305,7 @@
 <div id="vignette"></div>
 <div id="hud-top">Audi &nbsp;kiTT</div>
 <div id="status">chargement du modèle…</div>
+<div id="toasts"></div>
 
 <!-- Dock : raccourcis vers les sections (scroll / swipe fait pareil) -->
 <nav id="dock">
@@ -762,7 +801,8 @@ const rimMat = new THREE.ShaderMaterial({
 function loadCar(chain) {
   chain = chain.filter(Boolean);
   if (!chain.length) {
-    statusEl.textContent = "modèle introuvable — génération en cours ?";
+    statusEl.textContent = "modèle introuvable";
+    window.kittToast?.("Modèle 3D introuvable", "aucun GLB chargeable dans hud/assets/");
     return;
   }
   new GLTFLoader().load(
@@ -857,6 +897,28 @@ addEventListener("resize", () => {
 //  vole vers la vue de la section et ses infos s'affichent en grand.
 //  La télémétrie vient d'un simulateur de conduite (même forme de données
 //  que python/obd.py) — à remplacer par un poll de /telemetry plus tard.
+
+// ---------- Toasts : affichage élégant des erreurs (et infos) ----------
+// kittToast(titre, détail, "error"|"info") — pile en haut à droite,
+// auto-disparition, toucher pour fermer. Les erreurs script et promesses
+// rejetées y atterrissent automatiquement : plus rien ne meurt en silence
+// dans la console.
+const toastsEl = document.getElementById("toasts");
+window.kittToast = (title, detail = "", kind = "error") => {
+  while (toastsEl.children.length >= 4) toastsEl.firstChild.remove();  // pas d'avalanche
+  const t = document.createElement("div");
+  t.className = "toast" + (kind === "info" ? " info" : "");
+  t.innerHTML = `<span class="ic">${kind === "info" ? "◈" : "⚠"}</span>` +
+                `<span><b>${title}</b>${detail ? `<small>${detail}</small>` : ""}</span>`;
+  const close = () => { t.classList.add("out"); setTimeout(() => t.remove(), 450); };
+  t.addEventListener("click", close);
+  setTimeout(close, kind === "info" ? 5000 : 9000);
+  toastsEl.appendChild(t);
+};
+addEventListener("error", (e) =>
+  kittToast("Erreur script", `${e.message}<br>${(e.filename || "").split("/").pop()}:${e.lineno ?? "?"}`));
+addEventListener("unhandledrejection", (e) =>
+  kittToast("Erreur asynchrone", String(e.reason?.message ?? e.reason ?? "inconnue")));
 
 // ---------- Horloge ----------
 const clockEl = document.getElementById("clock");
@@ -1050,15 +1112,29 @@ const carPos = {
   lon: Number(P.get("lon")) || 2.2988,
 };
 
-(async () => {
+// Chargement de la ville, avec reprise automatique : les serveurs OSM
+// publics rate-limitent, on retente 2 fois avant de rendre la main
+// (le bandeau devient alors touchable pour relancer manuellement).
+let cityLoaded = false;
+async function loadCity(attempt = 0) {
+  navBanner.textContent = attempt ? `nouvelle tentative (${attempt + 1}/3)…` : "chargement de la carte…";
   try {
     const n = await window.__kittMap.load(carPos.lat, carPos.lon, 700);
+    cityLoaded = true;
     navBanner.textContent = "Où va-t-on ?";
-    console.log(`[nav] ville chargée : ${n} éléments OSM`);
+    kittToast("Carte chargée", `${n} éléments OSM autour de la position`, "info");
   } catch (e) {
-    navBanner.textContent = "carte indisponible (" + e.message + ")";
+    if (attempt < 2) {
+      await new Promise(r => setTimeout(r, 1800 * (attempt + 1)));
+      return loadCity(attempt + 1);
+    }
+    kittToast("Carte OSM indisponible", e.message + " — toucher le bandeau pour réessayer");
+    navBanner.textContent = "↻ carte indisponible — toucher pour réessayer";
   }
-})();
+}
+document.querySelector("#sec-nav .banner").classList.add("touch");
+navBanner.addEventListener("click", () => { if (!cityLoaded) loadCity(); });
+loadCity();
 
 // --- Clavier tactile AZERTY ---
 const KBD_ROWS = ["azertyuiop", "qsdfghjklm", "wxcvbn'-"];
@@ -1119,7 +1195,8 @@ async function geocode(q, pickFirst = false) {
       navResults.appendChild(b);
     }
   } catch (e) {
-    navResults.innerHTML = `<button disabled>recherche indisponible — ${e.message}</button>`;
+    kittToast("Recherche indisponible", e.message);
+    navResults.innerHTML = "";
   }
 }
 
@@ -1138,7 +1215,8 @@ async function setDestination(hit) {
     navDist = route.distance / 1000;
     navStreet = navQ.value;
   } catch (e) {
-    navBanner.textContent = "itinéraire indisponible (" + e.message + ")";
+    kittToast("Itinéraire indisponible", e.message);
+    navBanner.textContent = "Où va-t-on ?";
     navStreet = null;
   }
 }
